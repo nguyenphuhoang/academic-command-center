@@ -315,16 +315,18 @@ export default function TeacherAttendancePage() {
 
                 <div className="bg-slate-50 p-6 rounded-[2rem] inline-block border border-slate-100 mb-6 shadow-inner relative">
                   {session.status === "active" ? (
-                    <>
+                    <div className="relative">
                       <img src={qrUrl} alt="Attendance QR Code" className="w-56 h-56 mx-auto" />
-                      <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black animate-pulse">
+                      {/* Floating Countdown Timer */}
+                      <div className="absolute -top-3 -right-3 bg-red-600 text-white px-4 py-2 rounded-2xl text-sm font-black shadow-lg shadow-red-200 animate-pulse z-50 flex items-center gap-2 border-2 border-white">
+                        <div className="w-2 h-2 bg-white rounded-full animate-ping" />
                         {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <div className="w-56 h-56 flex flex-col items-center justify-center bg-slate-200 rounded-2xl">
                       <QrCode className="w-16 h-16 text-slate-400 mb-2" />
-                      <p className="text-slate-500 font-bold text-xs">Mã đã hết hạn</p>
+                      <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Mã đã hết hạn</p>
                     </div>
                   )}
                 </div>
