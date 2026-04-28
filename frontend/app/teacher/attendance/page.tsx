@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { MapPin, QrCode, Play, Loader2, CheckCircle2, AlertCircle, ChevronLeft, Users, Download, UserCheck } from "lucide-react";
 import Link from "next/link";
