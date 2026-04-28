@@ -5,11 +5,13 @@ import { MapPin, QrCode, Play, Loader2, CheckCircle2, AlertCircle, ChevronLeft, 
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase Client for Realtime
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
+// Initialize Supabase Client for Realtime safely
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
 
 interface ClassItem {
   id: string;
@@ -43,6 +45,7 @@ export default function TeacherAttendancePage() {
 
   // Fetch initial records when session is created
   const fetchRecords = useCallback(async (sessionId: string) => {
+    if (!supabase) return;
     try {
       const { data, error } = await supabase
         .from("attendance_records")
@@ -77,7 +80,7 @@ export default function TeacherAttendancePage() {
 
   // Real-time subscription
   useEffect(() => {
-    if (!session) return;
+    if (!session || !supabase) return;
 
     fetchRecords(session.id);
 
@@ -92,8 +95,8 @@ export default function TeacherAttendancePage() {
           table: "attendance_records",
           filter: `session_id=eq.${session.id}`,
         },
-        (payload) => {
-          const newRecord = payload.new as AttendanceRecord;
+        (payload: { new: AttendanceRecord }) => {
+          const newRecord = payload.new;
           setRecords((current) => [newRecord, ...current]);
           
           // Play a subtle sound if possible (optional)
