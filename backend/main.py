@@ -5,6 +5,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Optional
+import math
 
 # Try to load .env file (for local development)
 if os.path.exists("../.env"):
@@ -60,6 +61,28 @@ class TaskCreate(BaseModel):
     deadline: str
     status: str
     subject_id: str
+
+class SessionCreate(BaseModel):
+    class_id: str
+    lat: float
+    lng: float
+
+class AttendanceSubmit(BaseModel):
+    session_id: str
+    mssv: str
+    lat: float
+    lng: float
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    # Earth radius in meters
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    
+    a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 @app.get("/api/subjects")
 def get_subjects():
@@ -198,6 +221,65 @@ def get_dashboard_summary():
         }
     except Exception as e:
         print(f"Dashboard error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/attendance/session")
+def create_attendance_session(session: SessionCreate):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        response = supabase.table("attendance_sessions").insert({
+            "class_id": session.class_id,
+            "teacher_lat": session.lat,
+            "teacher_lng": session.lng,
+            "status": "active"
+        }).execute()
+        return response.data[0] if response.data else {"status": "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/attendance/submit")
+def submit_attendance(submission: AttendanceSubmit):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # 1. Get session info to get teacher's location
+        session_res = supabase.table("attendance_sessions").select("*").eq("id", submission.session_id).single().execute()
+        if not session_res.data:
+            raise HTTPException(status_code=404, detail="Buổi điểm danh không tồn tại.")
+        
+        session = session_res.data
+        if session["status"] != "active":
+            raise HTTPException(status_code=400, detail="Buổi điểm danh này đã kết thúc.")
+
+        # 2. Calculate distance
+        dist = calculate_distance(
+            session["teacher_lat"], session["teacher_lng"],
+            submission.lat, submission.lng
+        )
+
+        # 3. Check distance (<= 50m)
+        if dist > 50:
+            raise HTTPException(status_code=400, detail=f"Bạn đang ở quá xa vị trí điểm danh ({dist:.1f}m).")
+
+        # 4. Save record
+        record_res = supabase.table("attendance_records").insert({
+            "session_id": submission.session_id,
+            "mssv": submission.mssv,
+            "student_lat": submission.lat,
+            "student_lng": submission.lng,
+            "distance": dist
+        }).execute()
+        
+        return {
+            "status": "success",
+            "message": "Điểm danh thành công!",
+            "distance": dist,
+            "data": record_res.data[0] if record_res.data else None
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
