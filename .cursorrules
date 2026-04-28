@@ -1,0 +1,16 @@
+# ACADEMIC COMMAND CENTER - RULES FOR AI
+
+## 1. PHONG CÁCH LẬP TRÌNH
+- Luôn sử dụng Next.js 14 App Router cho Frontend và FastAPI cho Backend.
+- Ưu tiên sự đơn giản, dễ bảo trì vì người dùng (Giảng viên) không rành kỹ thuật.
+- Mọi thông báo lỗi (Error Message) phải thân thiện và hiển thị bằng tiếng Việt.
+
+## 2. QUY TẮC TRÁNH LỖI (ANTI-BUG SKILLS)
+- **Timezone:** Luôn lưu thời gian ở dạng UTC ISO 8601 trong Database, nhưng hiển thị cho người dùng theo giờ Việt Nam (GMT+7).
+- **Security:** Không bao giờ để lộ API Key của Supabase hay Gemini trong code. Luôn sử dụng file `.env`.
+- **Data Integrity:** Khi xóa một Task, KHÔNG ĐƯỢC xóa file tài liệu đính kèm trừ khi có yêu cầu riêng biệt.
+
+## 3. GIAO DIỆN (UI/UX)
+- Sử dụng bảng màu Slate & Indigo.
+- Font chữ mặc định: Inter.
+- Luôn có màn hình "Loading" khi AI đang xử lý dữ liệu để người dùng không cảm thấy app bị treo.
