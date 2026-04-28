@@ -8,12 +8,15 @@ function StudentAttendanceContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
 
-  const [mssv, setMssv] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<{message: string, distance: number} | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  // Check if already attended on this device
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionId) {
+      const saved = localStorage.getItem(`attended_${sessionId}`);
+      if (saved) {
+        setSuccess(JSON.parse(saved));
+      }
+    }
+  }, [sessionId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,10 +54,13 @@ function StudentAttendanceContent() {
 
           const data = await res.json();
           if (res.ok) {
-            setSuccess({
+            const successData = {
               message: data.message,
               distance: data.distance
-            });
+            };
+            setSuccess(successData);
+            // Save to localStorage to prevent re-submitting for another MSSV
+            localStorage.setItem(`attended_${sessionId}`, JSON.stringify(successData));
           } else {
             setError(data.detail || "Điểm danh thất bại.");
           }
@@ -84,6 +90,7 @@ function StudentAttendanceContent() {
           <p className="text-xs text-slate-400 uppercase font-black">Khoảng cách</p>
           <p className="text-2xl font-bold text-indigo-600">{success.distance.toFixed(1)}m</p>
         </div>
+        <p className="text-xs text-slate-400 mt-6 italic">Thông tin đã được lưu trên thiết bị này.</p>
       </div>
     );
   }
@@ -137,7 +144,7 @@ function StudentAttendanceContent() {
         </button>
         
         <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest px-4">
-          Hệ thống sẽ kiểm tra GPS của bạn trong bán kính 50m quanh giáo viên.
+          Hệ thống sẽ kiểm tra GPS trong bán kính 100m quanh giáo viên.
         </p>
       </form>
     </div>

@@ -40,6 +40,8 @@ export default function TeacherAttendancePage() {
   const [loading, setLoading] = useState(false);
   const [fetchingClasses, setFetchingClasses] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
+  const [isSessionActive, setIsSessionActive] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -110,6 +112,34 @@ export default function TeacherAttendancePage() {
     };
   }, [session, fetchRecords]);
 
+  // Countdown timer logic
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isSessionActive && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && isSessionActive) {
+      handleEndSession();
+    }
+    return () => clearInterval(timer);
+  }, [isSessionActive, timeLeft]);
+
+  const handleEndSession = async () => {
+    if (!session) return;
+    
+    setIsSessionActive(false);
+    try {
+      await fetch(`${API_URL}/api/attendance/session/${session.id}?status=inactive`, {
+        method: "PATCH",
+      });
+      // We keep the session in state to show the list, but marked as inactive
+      setSession({ ...session, status: "inactive" });
+    } catch (err) {
+      console.error("Failed to end session:", err);
+    }
+  };
+
   const handleStartAttendance = () => {
     if (!selectedClassId) {
       setError("Vui lòng chọn lớp học.");
@@ -141,6 +171,8 @@ export default function TeacherAttendancePage() {
           if (res.ok) {
             const data = await res.json();
             setSession(data);
+            setIsSessionActive(true);
+            setTimeLeft(180); // Reset to 3 minutes
           } else {
             const errData = await res.json();
             setError(errData.detail || "Không thể tạo buổi điểm danh.");
@@ -281,14 +313,30 @@ export default function TeacherAttendancePage() {
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-6 rounded-[2rem] inline-block border border-slate-100 mb-6 shadow-inner">
-                  <img src={qrUrl} alt="Attendance QR Code" className="w-56 h-56 mx-auto" />
+                <div className="bg-slate-50 p-6 rounded-[2rem] inline-block border border-slate-100 mb-6 shadow-inner relative">
+                  {session.status === "active" ? (
+                    <>
+                      <img src={qrUrl} alt="Attendance QR Code" className="w-56 h-56 mx-auto" />
+                      <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black animate-pulse">
+                        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center bg-slate-200 rounded-2xl">
+                      <QrCode className="w-16 h-16 text-slate-400 mb-2" />
+                      <p className="text-slate-500 font-bold text-xs">Mã đã hết hạn</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <p className="text-slate-900 font-bold text-lg">Quét mã để nộp</p>
+                  <p className="text-slate-900 font-bold text-lg">
+                    {session.status === "active" ? "Quét mã để nộp" : "Phiên đã kết thúc"}
+                  </p>
                   <p className="text-slate-400 text-xs px-4">
-                    Tọa độ của bạn đã được khóa làm tâm điểm danh.
+                    {session.status === "active" 
+                      ? "Tọa độ của bạn đã được khóa làm tâm điểm danh."
+                      : "Không nhận thêm dữ liệu điểm danh mới."}
                   </p>
                 </div>
               </div>
@@ -300,7 +348,7 @@ export default function TeacherAttendancePage() {
               </div>
 
               <button
-                onClick={() => setSession(null)}
+                onClick={handleEndSession}
                 className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-4 rounded-2xl font-bold transition-all"
               >
                 Kết thúc buổi học
