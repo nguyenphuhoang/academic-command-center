@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { BookOpen, Archive, LayoutDashboard, Settings, CheckSquare } from "lucide-react";
+import { BookOpen, Archive, LayoutDashboard, Settings, CheckSquare, MapPin } from "lucide-react";
 import Link from "next/link";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -46,6 +46,10 @@ export default function RootLayout({
               <Link href="/archive" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
                 <Archive className="w-5 h-5" />
                 Lưu Trữ (Archive)
+              </Link>
+              <Link href="/teacher/attendance" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <MapPin className="w-5 h-5" />
+                Điểm danh (Teacher)
               </Link>
               <div className="pt-4 mt-4 border-t border-slate-800/50">
                 <Link href="/connection-test" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition-colors text-sm">
