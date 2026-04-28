@@ -8,6 +8,13 @@ function StudentAttendanceContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
 
+  const [mssv, setMssv] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<{message: string, distance: number} | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   // Check if already attended on this device
   useEffect(() => {
     if (typeof window !== "undefined" && sessionId) {

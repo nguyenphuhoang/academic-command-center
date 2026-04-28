@@ -114,7 +114,7 @@ export default function TeacherAttendancePage() {
 
   // Countdown timer logic
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (isSessionActive && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
