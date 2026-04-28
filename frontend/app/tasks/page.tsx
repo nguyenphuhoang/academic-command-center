@@ -24,9 +24,16 @@ export default function TasksPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tất cả");
+
+  // Form states
+  const [title, setTitle] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [status, setStatus] = useState("Chưa bắt đầu");
+  const [subjectId, setSubjectId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -36,7 +43,7 @@ export default function TasksPage() {
         fetch(`${apiUrl}/api/tasks`),
         fetch(`${apiUrl}/api/subjects`)
       ]);
-      
+
       if (tasksRes.ok && subjectsRes.ok) {
         const tasksData = await tasksRes.json();
         const subjectsData = await subjectsRes.json();
@@ -63,7 +70,7 @@ export default function TasksPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !deadline || !status || !subjectId) return;
-    
+
     setSubmitting(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -72,14 +79,14 @@ export default function TasksPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
-          title, 
-          deadline, 
-          status, 
-          subject_id: subjectId.toString() 
+        body: JSON.stringify({
+          title,
+          deadline,
+          status,
+          subject_id: subjectId.toString()
         }),
       });
-      
+
       if (res.ok) {
         setIsModalOpen(false);
         setTitle("");
@@ -120,7 +127,7 @@ export default function TasksPage() {
           <h2 className="text-3xl font-bold text-slate-900">Công việc</h2>
           <p className="text-slate-500 mt-2">Theo dõi và quản lý các công việc giảng dạy và nghiên cứu.</p>
         </div>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
         >
@@ -132,15 +139,15 @@ export default function TasksPage() {
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="flex-1 relative">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Tìm kiếm công việc..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-6 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm"
           />
         </div>
-        <select 
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-6 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm text-slate-600 font-medium appearance-none"
@@ -167,7 +174,7 @@ export default function TasksPage() {
           <p className="text-slate-500 max-w-sm mx-auto mb-8">
             {searchTerm || statusFilter !== "Tất cả" ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm." : "Bắt đầu quản lý thời gian của bạn bằng cách thêm công việc đầu tiên."}
           </p>
-          <button 
+          <button
             onClick={() => {
               setSearchTerm("");
               setStatusFilter("Tất cả");
@@ -180,17 +187,17 @@ export default function TasksPage() {
       ) : (
         <div className="space-y-4">
           {filteredTasks.map((task) => (
-            <div 
-              key={task.id.toString()} 
+            <div
+              key={task.id.toString()}
               className={`bg-white rounded-2xl p-5 shadow-sm border transition-all flex items-center gap-5 ${task.status === 'Hoàn thành' ? 'bg-slate-50/50 border-slate-100' : 'border-slate-100 hover:border-indigo-200 hover:shadow-md'}`}
             >
-              <button 
+              <button
                 onClick={() => toggleTaskStatus(task)}
                 className={`flex-shrink-0 transition-all ${task.status === 'Hoàn thành' ? 'text-indigo-600 scale-110' : 'text-slate-200 hover:text-indigo-400'}`}
               >
                 {task.status === 'Hoàn thành' ? <CheckSquare className="w-7 h-7" /> : <Square className="w-7 h-7" />}
               </button>
-              
+
               <div className="flex-1 min-w-0">
                 <h3 className={`font-bold text-slate-900 text-lg truncate ${task.status === 'Hoàn thành' ? 'line-through text-slate-400 font-medium' : ''}`}>
                   {task.title}
@@ -207,13 +214,12 @@ export default function TasksPage() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex-shrink-0">
-                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight ${
-                  task.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' : 
-                  task.status === 'Đang thực hiện' ? 'bg-amber-100 text-amber-700' : 
-                  'bg-slate-100 text-slate-600'
-                }`}>
+                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight ${task.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' :
+                    task.status === 'Đang thực hiện' ? 'bg-amber-100 text-amber-700' :
+                      'bg-slate-100 text-slate-600'
+                  }`}>
                   {task.status}
                 </span>
               </div>
@@ -228,20 +234,20 @@ export default function TasksPage() {
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h3 className="text-xl font-bold text-slate-900">Thêm Công Việc Mới</h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên việc</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="VD: Chấm bài tập lớn"
@@ -249,10 +255,10 @@ export default function TasksPage() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Môn học</label>
-                  <select 
+                  <select
                     value={subjectId}
                     onChange={(e) => setSubjectId(e.target.value)}
                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-900"
@@ -268,8 +274,8 @@ export default function TasksPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Hạn chót</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={deadline}
                       onChange={(e) => setDeadline(e.target.value)}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-900"
@@ -278,7 +284,7 @@ export default function TasksPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                    <select 
+                    <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-900"
@@ -292,14 +298,14 @@ export default function TasksPage() {
               </div>
 
               <div className="mt-8 flex gap-3">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors"
                 >
                   Hủy
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={submitting}
                   className="flex-1 px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors disabled:opacity-70 flex justify-center items-center gap-2"
