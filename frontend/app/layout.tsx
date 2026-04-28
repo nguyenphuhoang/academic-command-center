@@ -20,8 +20,8 @@ export default function RootLayout({
     <html lang="vi">
       <body className={inter.className}>
         <div className="flex h-screen overflow-hidden bg-slate-50">
-          {/* Sidebar */}
-          <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col">
+          {/* Sidebar - Hidden on Mobile */}
+          <aside className="hidden md:flex w-64 bg-slate-900 text-slate-100 flex-col flex-shrink-0">
             <div className="p-6">
               <Link href="/" className="group">
                 <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 group-hover:text-indigo-400 transition-colors">
@@ -73,8 +73,8 @@ export default function RootLayout({
             </div>
           </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-y-auto p-8 bg-slate-50">
+          {/* Main Content - Full width on Mobile */}
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 w-full">
             {children}
           </main>
         </div>
