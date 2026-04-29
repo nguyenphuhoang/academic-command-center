@@ -350,36 +350,55 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         wb = openpyxl.load_workbook(buffer, data_only=True)
         sheet = wb.active
 
-        # Read Class Code from E1 (row 1, column 5)
-        class_code = sheet.cell(row=1, column=5).value
-        if not class_code:
-            # Fallback to B5 just in case
-            class_code = sheet.cell(row=5, column=2).value
-            
-        if not class_code:
-            raise HTTPException(status_code=400, detail="Không tìm thấy mã lớp tại ô E1 hoặc B5.")
+        # --- DYNAMIC SEARCH LOGIC ---
+        class_code = None
+        start_row = 7 # Default fallback
+        
+        # 1. Scan for Class Code and Table Header
+        for r in range(1, 15): # Scan first 15 rows
+            for c in range(1, 10): # Scan first 10 columns
+                val = str(sheet.cell(row=r, column=c).value or "").strip()
+                
+                # Search for Class Code (Look for pattern like 225NMG...)
+                if not class_code and len(val) >= 7 and any(char.isdigit() for char in val):
+                    # Simple heuristic: if it looks like a class code and is in a likely spot
+                    if r < 5: class_code = val
+                
+                # Search for Table Header to find where data starts
+                if "Mã SV" in val or "MSSV" in val:
+                    start_row = r + 1
+                    break
 
-        # Read Student Data starting from row 7
+        if not class_code:
+            class_code = sheet.cell(row=1, column=5).value or "UNKNOWN"
+
+        # 2. Read Student Data
         students_data = []
-        for row in range(7, sheet.max_row + 1):
+        for row in range(start_row, sheet.max_row + 1):
             mssv = sheet.cell(row=row, column=2).value
             if not mssv: 
-                # Check if it's just a blank line or end of data
-                if row > 500: break # Safety break
+                if row > start_row + 10: break
                 continue
             
             first_name = sheet.cell(row=row, column=3).value or ""
             last_name = sheet.cell(row=row, column=4).value or ""
             name = f"{str(first_name).strip()} {str(last_name).strip()}".strip()
             
+            # Read REAL Email from Column F (Column 6)
+            email = sheet.cell(row=row, column=6).value
+            if not email:
+                # Fallback if email is missing in some rows
+                email = f"{str(mssv).strip()}@student.edu.vn"
+            
             students_data.append({
                 "mssv": str(mssv).strip(),
                 "name": name,
+                "email": str(email).strip(),
                 "class_code": str(class_code).strip()
             })
 
         if not students_data:
-            raise HTTPException(status_code=400, detail="Không tìm thấy dữ liệu sinh viên từ dòng 7.")
+            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên hợp lệ (Bắt đầu quét từ dòng {start_row}).")
 
         # Upsert into students table
         res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
