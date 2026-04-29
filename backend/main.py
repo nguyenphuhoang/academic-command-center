@@ -335,25 +335,25 @@ def update_attendance_session_status(session_id: str, status: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/admin/sync-students")
-async def sync_students_from_excel():
+async def sync_students_from_excel(file: UploadFile = File(...)):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     
-    file_path = "../danh-sach-sinh-vien/DanhSachSVLHP_225NMG02.xlsx"
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"Không tìm thấy file Excel tại {file_path}")
-
     try:
+        # Read file content into memory buffer
+        contents = await file.read()
+        buffer = io.BytesIO(contents)
+
         # Read Class Code from B5
-        header_df = pd.read_excel(file_path, header=None, nrows=6)
+        header_df = pd.read_excel(buffer, header=None, nrows=6)
+        # Reset buffer for the next read
+        buffer.seek(0)
+        
         class_code = header_df.iloc[4, 1] # B5 (index 4, 1)
 
         # Read Student Data starting from row 9 (index 8)
-        # B: MSSV, C+D: Họ tên
-        df = pd.read_excel(file_path, skiprows=8)
+        df = pd.read_excel(buffer, skiprows=8)
         
-        # Adjust columns based on the file structure (B is usually the 2nd column)
-        # Using index for safety
         students_data = []
         for index, row in df.iterrows():
             if pd.isna(row.iloc[1]): break # End of list
@@ -370,12 +370,11 @@ async def sync_students_from_excel():
             })
 
         # Upsert into students table
-        # Note: Upsert in Supabase Python needs a list of dicts
         res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
         
         return {"status": "success", "count": len(students_data), "class_code": class_code}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi đọc file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
 
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):

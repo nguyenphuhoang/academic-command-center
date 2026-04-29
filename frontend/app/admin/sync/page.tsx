@@ -6,19 +6,29 @@ import Link from "next/link";
 
 export default function AdminSyncPage() {
   const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<{count: number, class_code: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const handleSync = async () => {
+    if (!file) {
+      setError("Vui lòng chọn một file Excel trước.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch(`${API_URL}/api/admin/sync-students`, {
         method: "POST",
+        body: formData,
       });
 
       if (res.ok) {
@@ -43,7 +53,7 @@ export default function AdminSyncPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Hệ Thống Quản Trị</h1>
-          <p className="text-slate-500 font-medium">Đồng bộ dữ liệu sinh viên từ file Excel</p>
+          <p className="text-slate-500 font-medium">Cập nhật danh sách sinh viên từ file Excel phòng đào tạo</p>
         </div>
       </header>
 
@@ -56,36 +66,60 @@ export default function AdminSyncPage() {
             <h2 className="text-xl font-bold text-slate-800">Dữ liệu nguồn</h2>
           </div>
 
-          <p className="text-slate-600 mb-6 leading-relaxed">
-            Hệ thống sẽ quét file <code className="bg-slate-100 px-2 py-1 rounded text-indigo-600 font-bold">DanhSachSVLHP_225NMG02.xlsx</code> trong thư mục gốc.
-          </p>
+          <div className="mb-6">
+            <label 
+              className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
+                file ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <RefreshCcw className={`w-10 h-10 mb-3 ${file ? 'text-indigo-500 animate-spin-slow' : 'text-slate-300'}`} />
+                {file ? (
+                  <p className="text-sm font-bold text-indigo-600 text-center px-4 truncate max-w-full">
+                    {file.name}
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2 text-sm text-slate-500 font-bold">Bấm để chọn file Excel</p>
+                    <p className="text-xs text-slate-400">Hỗ trợ .xlsx hoặc .xls</p>
+                  </>
+                )}
+              </div>
+              <input 
+                type="file" 
+                className="hidden" 
+                accept=".xlsx,.xls" 
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+            </label>
+          </div>
 
           <ul className="space-y-3 mb-8 text-sm font-medium text-slate-500">
             <li className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Lấy Mã lớp tại ô B5
+              Tự động lấy Mã lớp tại ô B5
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Lấy MSSV, Họ tên, Email từ dòng 9
+              Lấy danh sách sinh viên từ dòng 9
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Tự động cập nhật nếu đã tồn tại (Upsert)
+              Cập nhật thông tin MSSV, Họ tên
             </li>
           </ul>
 
           <button
             onClick={handleSync}
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+            disabled={loading || !file}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95"
           >
             {loading ? (
               <RefreshCcw className="w-6 h-6 animate-spin" />
             ) : (
               <>
                 <Database className="w-6 h-6" />
-                ĐỒNG BỘ NGAY
+                ĐỒNG BỘ DỮ LIỆU
               </>
             )}
           </button>
