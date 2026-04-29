@@ -421,7 +421,17 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         # Upsert into students table
         res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
         
-        return {"status": "success", "count": len(students_data), "class_code": str(class_code).strip()}
+        # Smart Linking: Đảm bảo Mã lớp từ Excel luôn có mặt trong bảng 'classes'
+        class_code_str = str(class_code).strip()
+        class_exists = supabase.table("classes").select("id").ilike("ma_lop", class_code_str).execute()
+        if not class_exists.data:
+            supabase.table("classes").insert({
+                "ma_lop": class_code_str,
+                "ten_mon": f"Lớp {class_code_str}"
+            }).execute()
+            print(f"DEBUG: Tự động tạo lớp mới cho mã: {class_code_str}")
+
+        return {"status": "success", "count": len(students_data), "class_code": class_code_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý file Excel: {str(e)}")
 

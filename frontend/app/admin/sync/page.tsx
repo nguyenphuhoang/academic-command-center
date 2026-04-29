@@ -203,27 +203,17 @@ export default function AdminSyncPage() {
               </div>
             )}
           </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-100 p-8 rounded-[2.5rem] animate-in shake-in duration-300">
-              <div className="flex items-center gap-4 mb-4 text-red-600">
-                <AlertCircle className="w-8 h-8" />
-                <h3 className="text-xl font-bold">Lỗi đồng bộ</h3>
-              </div>
-              <p className="text-red-900 font-medium">{error}</p>
-            </div>
-          )}
-          
-          {!result && !error && !loading && (
-            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-[2.5rem] p-8 text-center text-slate-400">
-              <RefreshCcw className="w-12 h-12 mb-4 opacity-20" />
-              <p className="font-bold">Chưa có hoạt động nào</p>
-              <p className="text-sm">Vui lòng nhấn nút Đồng bộ ở bên trái</p>
-            </div>
-          )}
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-100 p-8 rounded-[2.5rem] animate-in shake-in duration-300">
+            <div className="flex items-center gap-4 mb-4 text-red-600">
+              <AlertCircle className="w-8 h-8" />
+              <h3 className="text-xl font-bold">Lỗi đồng bộ</h3>
+            </div>
+            <p className="text-red-900 font-medium">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );
