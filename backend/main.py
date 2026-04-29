@@ -115,7 +115,7 @@ def get_subjects():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        response = supabase.table("subjects").select("*").execute()
+        response = supabase.table("subjects").select("*").order("name").execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
