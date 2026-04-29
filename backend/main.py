@@ -326,8 +326,8 @@ def submit_attendance(submission: AttendanceSubmit):
             "mssv": submission.mssv,
             "student_lat": submission.lat,
             "student_lng": submission.lng,
-            "distance": dist
-            # "device_id": submission.device_id  # Tạm ẩn vì CSDL chưa có cột này
+            "distance": dist,
+            "device_id": submission.device_id 
         }).execute()
         
         return {
@@ -483,6 +483,17 @@ def reset_student_device(mssv: str):
         if not res.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy sinh viên.")
         return {"status": "success", "message": "Đã reset thiết bị thành công"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/students/{mssv}/reset-device")
+def reset_student_device(mssv: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # Xóa current_device_id để sinh viên có thể dùng máy mới
+        res = supabase.table("students").update({"current_device_id": None}).eq("mssv", mssv).execute()
+        return {"status": "success", "message": f"Đã reset thiết bị cho sinh viên {mssv}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

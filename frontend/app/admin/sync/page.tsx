@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Database, RefreshCcw, CheckCircle2, AlertCircle, ChevronLeft, FileSpreadsheet } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Database, RefreshCcw, CheckCircle2, AlertCircle, ChevronLeft, FileSpreadsheet, Loader2, FileDown, RefreshCw, UserCheck } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminSyncPage() {
@@ -69,9 +69,9 @@ export default function AdminSyncPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchAllStudents();
-  });
+  }, []);
 
   // Group students by class_code
   const groupedStudents = allStudents.reduce((acc, student) => {
