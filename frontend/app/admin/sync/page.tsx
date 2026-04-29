@@ -21,7 +21,7 @@ export default function AdminSyncPage() {
   const fetchAllStudents = async () => {
     setFetching(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/students`);
+      const res = await fetch(`${API_URL}/api/admin/students?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setAllStudents(data);
