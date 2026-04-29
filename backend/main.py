@@ -94,7 +94,8 @@ def get_classes():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        response = supabase.table("classes").select("*").execute()
+        # Join with subjects table to get the subject name (Normalization)
+        response = supabase.table("classes").select("*, subjects(name)").execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -364,106 +365,79 @@ def update_attendance_session_status(session_id: str, status: str):
 import openpyxl
 import openpyxl.styles
 
+
+
 @app.post("/api/admin/sync-students")
 async def sync_students_from_excel(file: UploadFile = File(...)):
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
-    
-    try:
-        # Read file content into memory buffer
-        contents = await file.read()
-        buffer = io.BytesIO(contents)
+        raise HTTPException(status_code=500, detail="Supabase not initialized.")
 
-        # Load workbook using openpyxl (much lighter than pandas)
-        wb = openpyxl.load_workbook(buffer, data_only=True)
+    try:
+        # Load workbook with data_only=True
+        contents = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
         sheet = wb.active
 
-        # 1. Scan for Class Code, Subject Name and Table Header
+        # 1. Metadata Detection (Header & Class Info)
+        start_row = 1
         class_code = None
         subject_name = None
-        start_row = 7 # Default fallback
         
-        for r in range(1, 15): # Scan first 15 rows
-            for c in range(1, 10): # Scan first 10 columns
+        for r in range(1, 16):
+            for c in range(1, 10):
                 val = str(sheet.cell(row=r, column=c).value or "").strip()
-                
-                # Search for Class Code (Look for pattern like 225NMG...)
+                # Class Code (7+ chars with digits)
                 if not class_code and len(val) >= 7 and any(char.isdigit() for char in val):
                     if r < 5: class_code = val
-                
-                # Search for Subject Name (Tên học phần)
+                # Subject Name
                 if "Tên học phần" in val:
                     subject_name = str(sheet.cell(row=r, column=c+2).value or "").strip()
-                    # Clean up subject name (remove "Số TC:...")
                     if " - Số TC:" in subject_name:
                         subject_name = subject_name.split(" - Số TC:")[0].strip()
-
-                # Search for Table Header to find where data starts
+                # Data Header
                 if "Mã SV" in val or "MSSV" in val:
                     start_row = r + 1
-                    break
 
         if not class_code:
-            class_code = sheet.cell(row=1, column=5).value or "UNKNOWN"
+            class_code = sheet.cell(row=1, column=5).value or "UNKNOWN_CLASS"
 
-        # 2. Read Student Data (Super Robust Loop)
-        students_data = []
-        # Quét tối đa 1000 dòng để chắc chắn không bỏ sót bất kỳ ai
-        for row_idx in range(start_row, 1000):
-            mssv_val = sheet.cell(row=row_idx, column=2).value
-            
-            # Nếu gặp 1 dòng trống, ta không dừng lại ngay mà kiểm tra xem 20 dòng tiếp theo có ai không
-            if not mssv_val:
-                has_more = False
-                for next_r in range(1, 21):
-                    if sheet.cell(row=row_idx + next_r, column=2).value:
-                        has_more = True
-                        break
-                if not has_more:
-                    break # Thực sự hết dữ liệu
-                continue
-            
-            mssv = str(mssv_val).strip()
-            if not mssv.isdigit() or len(mssv) < 5:
-                continue
-                
-            first_name = sheet.cell(row=row_idx, column=3).value or ""
-            last_name = sheet.cell(row=row_idx, column=4).value or ""
-            name = f"{str(first_name).strip()} {str(last_name).strip()}".strip()
-            
-            if not name or len(name) < 2:
-                continue
-            
-            email = sheet.cell(row=row_idx, column=6).value
-            if not email:
-                email = f"{mssv}@student.edu.vn"
-            
-            students_data.append({
-                "mssv": mssv,
-                "name": name,
-                "email": str(email).strip()
-            })
-
-        if not students_data:
-            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên trong file.")
-
-        # 3. Insert/Update Students (Batching for stability)
-        for i in range(0, len(students_data), 50):
-            batch = students_data[i:i+50]
-            supabase.table("students").upsert(batch, on_conflict="mssv").execute()
+        # 2. Scientific Data Cleaning
+        processed_students = []
+        stats = {"total_rows_found": 0, "successfully_synced": 0, "errors": 0}
         
-        # 4. Handle Class and Subject
+        for row_idx in range(start_row, sheet.max_row + 1):
+            stats["total_rows_found"] += 1
+            
+            # Step 2.1: Extraction & Stripping
+            mssv_raw = sheet.cell(row=row_idx, column=2).value
+            mssv = str(mssv_raw or "").strip()
+            
+            first_name = str(sheet.cell(row=row_idx, column=3).value or "").strip()
+            last_name = str(sheet.cell(row=row_idx, column=4).value or "").strip()
+            full_name = f"{first_name} {last_name}".strip()
+            
+            # Step 2.2: Scientific Validation
+            if not mssv.isdigit() or len(mssv) < 5 or not full_name or len(full_name) < 2:
+                stats["errors"] += 1
+                continue
+            
+            email = str(sheet.cell(row=row_idx, column=6).value or f"{mssv}@student.edu.vn").strip()
+            processed_students.append({"mssv": mssv, "name": full_name, "email": email})
+
+        if not processed_students:
+            return {**stats, "detail": "Không có dữ liệu hợp lệ."}
+
+        # 3. Database Sync (Relational Strategy)
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         
-        # 4.1 Đảm bảo Môn học (Subject) tồn tại
+        # 3.1: Upsert Subject & Get subject_id
         subject_id = None
         if subject_name:
             try:
                 import re
                 subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
                 subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
-                
                 sub_res = supabase.table("subjects").upsert({
                     "name": subject_name,
                     "code": subj_code,
@@ -472,37 +446,38 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
                 
                 if sub_res.data:
                     subject_id = sub_res.data[0]["id"]
-            except Exception as sub_err:
-                print(f"Warning: Could not sync subject '{subject_name}': {str(sub_err)}")
+            except Exception as e: 
+                print(f"Subject Sync Error: {e}")
 
+        # 3.2: Upsert Class with subject_id
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
-        
         if not class_res.data:
-            new_class = supabase.table("classes").insert({
+            class_obj = supabase.table("classes").insert({
                 "ma_lop": class_code_str,
-                "ten_mon": subject_name if subject_name else f"Lớp {class_code_str}",
+                "subject_id": subject_id,
                 "semester": semester_str
             }).execute()
-            class_id = new_class.data[0]["id"]
+            class_id = class_obj.data[0]["id"]
         else:
             class_id = class_res.data[0]["id"]
-            if subject_name:
-                supabase.table("classes").update({"ten_mon": subject_name}).eq("id", class_id).execute()
-            
-        # 5. Link Students to Class (Clear old first to be accurate)
-        try:
-            supabase.table("class_students").delete().eq("class_id", class_id).execute()
-        except Exception as e:
-            print(f"Cleanup error: {e}")
+            supabase.table("classes").update({"subject_id": subject_id}).eq("id", class_id).execute()
 
-        links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
-        for i in range(0, len(links), 50):
-            chunk = links[i:i + 50]
-            supabase.table("class_students").insert(chunk).execute()
-        
-        return {"status": "success", "count": len(students_data), "class_code": class_code_str, "semester": semester_str}
+        # 3.3: Batch Upsert Students
+        for i in range(0, len(processed_students), 100):
+            batch = processed_students[i:i+100]
+            supabase.table("students").upsert(batch, on_conflict="mssv").execute()
+            
+        # 3.4: Batch Upsert Junction (Enrollment)
+        junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
+        for i in range(0, len(junction_data), 100):
+            batch = junction_data[i:i+100]
+            supabase.table("class_students").upsert(batch, on_conflict="class_id, mssv").execute()
+
+        stats["successfully_synced"] = len(processed_students)
+        return stats
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file Excel: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Scientific Sync Error: {str(e)}")
 
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):
