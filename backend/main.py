@@ -509,26 +509,23 @@ def get_session_status(session_id: str):
         class_id = session_res.data["class_id"]
         
         # 1. Tìm mã lớp (class_code) từ session này
-        # Thử tìm theo UUID trước
         class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).execute()
         
-        final_class_code = str(class_id).strip() # Mặc định coi ID là mã lớp (trường hợp session cũ)
+        search_code = str(class_id).strip()
         if class_res.data and len(class_res.data) > 0:
-            final_class_code = str(class_res.data[0]["ma_lop"]).strip()
+            search_code = str(class_res.data[0]["ma_lop"]).strip()
 
-        # 2. Lấy TẤT CẢ sinh viên có mã lớp này (không quan tâm ID lớp là gì)
-        students_res = supabase.table("students").select("*").ilike("class_code", final_class_code).execute()
+        # 2. Lấy sinh viên - Dùng Wildcard % để tìm kiếm gần đúng (vd: %225NMG03%)
+        # Điều này giúp bỏ qua các khoảng trắng thừa hoặc ký tự rác
+        students_res = supabase.table("students").select("*").ilike("class_code", f"%{search_code}%").execute()
         all_students = students_res.data or []
         
-        # Nếu vẫn không thấy ai, thử tìm theo tên môn học (để chắc chắn 100%)
-        if not all_students:
-            # Lấy tên môn từ class_id
-            class_info = supabase.table("classes").select("ten_mon").eq("id", class_id).execute()
-            if class_info.data:
-                ten_mon = class_info.data[0]["ten_mon"]
-                # Tìm các sinh viên có mã lớp chứa một phần tên môn hoặc mã lớp tương ứng
-                # Đây là bước dự phòng cuối cùng
-                pass 
+        # Nếu vẫn không thấy ai (do mã lớp trong bảng students quá khác), 
+        # thử lấy mã ngắn hơn (ví dụ bỏ phần đuôi)
+        if not all_students and len(search_code) > 4:
+            short_code = search_code[:6] # Lấy 6 ký tự đầu (vd: 225NMG)
+            students_res = supabase.table("students").select("*").ilike("class_code", f"%{short_code}%").execute()
+            all_students = students_res.data or []
 
         # 3. Lấy danh sách đã điểm danh
         records_res = supabase.table("attendance_records").select("mssv, distance, created_at").eq("session_id", session_id).execute()
