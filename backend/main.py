@@ -479,18 +479,27 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
                 "ten_mon": final_subject_name
             }).eq("id", class_id).execute()
 
-        # 3.3: Batch Upsert Students
-        for i in range(0, len(processed_students), 100):
-            batch = processed_students[i:i+100]
+        # 3.2: Batch Upsert Students (Information Table)
+        print(f"DEBUG: Bat dau Upsert {len(processed_students)} sinh vien vao bang students...")
+        for i in range(0, len(processed_students), 50):
+            batch = processed_students[i:i+50]
             supabase.table("students").upsert(batch, on_conflict="mssv").execute()
             
-        # 3.4: Batch Upsert Junction (Enrollment)
-        junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
-        for i in range(0, len(junction_data), 100):
-            batch = junction_data[i:i+100]
+        # 3.3: Batch Upsert Junction (Enrollment Table)
+        print(f"DEBUG: Bat dau lien ket {len(processed_students)} sinh vien vao lop {class_code_str}...")
+        junction_data = []
+        for s in processed_students:
+            # Debug log cho tung nguoi
+            # print(f"DEBUG: Lien ket {s['mssv']} vao class_id {class_id}")
+            junction_data.append({"class_id": class_id, "mssv": s["mssv"]})
+            
+        # Chia nho de Upsert cho chac chan
+        for i in range(0, len(junction_data), 50):
+            batch = junction_data[i:i+50]
             supabase.table("class_students").upsert(batch, on_conflict="class_id, mssv").execute()
 
         stats["successfully_synced"] = len(processed_students)
+        print(f"DEBUG: Hoan tat dong bo. Database hien tai phai co {len(processed_students)} sinh vien cho lop nay.")
         return stats
 
     except Exception as e:
