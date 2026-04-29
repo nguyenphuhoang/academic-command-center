@@ -169,12 +169,14 @@ export default function SubjectsPage() {
                   </span>
                   <button 
                     onClick={(e) => {
-                      e.preventDefault();
+                      e.stopPropagation(); // Ngăn việc bấm nhầm vào thẻ
                       handleDelete(sub.id);
                     }}
-                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all border border-red-100 group/btn"
+                    title="Xóa học phần này"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase">XÓA</span>
                   </button>
                 </div>
               </div>
