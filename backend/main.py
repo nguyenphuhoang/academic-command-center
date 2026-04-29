@@ -378,20 +378,26 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         wb = openpyxl.load_workbook(buffer, data_only=True)
         sheet = wb.active
 
-        # --- DYNAMIC SEARCH LOGIC ---
+        # 1. Scan for Class Code, Subject Name and Table Header
         class_code = None
+        subject_name = None
         start_row = 7 # Default fallback
         
-        # 1. Scan for Class Code and Table Header
         for r in range(1, 15): # Scan first 15 rows
             for c in range(1, 10): # Scan first 10 columns
                 val = str(sheet.cell(row=r, column=c).value or "").strip()
                 
                 # Search for Class Code (Look for pattern like 225NMG...)
                 if not class_code and len(val) >= 7 and any(char.isdigit() for char in val):
-                    # Simple heuristic: if it looks like a class code and is in a likely spot
                     if r < 5: class_code = val
                 
+                # Search for Subject Name (Tên học phần)
+                if "Tên học phần" in val:
+                    subject_name = str(sheet.cell(row=r, column=c+2).value or "").strip()
+                    # Clean up subject name (remove "Số TC:...")
+                    if " - Số TC:" in subject_name:
+                        subject_name = subject_name.split(" - Số TC:")[0].strip()
+
                 # Search for Table Header to find where data starts
                 if "Mã SV" in val or "MSSV" in val:
                     start_row = r + 1
@@ -433,17 +439,37 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         
+        # 4.1 Đảm bảo Môn học (Subject) tồn tại
+        subject_id = None
+        if subject_name:
+            # Derive a subject code from class_code (e.g. 225CHKCHST02 -> CHKCHST)
+            import re
+            subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
+            subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
+            
+            sub_res = supabase.table("subjects").upsert({
+                "name": subject_name,
+                "code": subj_code,
+                "semester": semester_str
+            }, on_conflict="name").execute()
+            
+            if sub_res.data:
+                subject_id = sub_res.data[0]["id"]
+
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
         
         if not class_res.data:
             new_class = supabase.table("classes").insert({
                 "ma_lop": class_code_str,
-                "ten_mon": f"Lớp {class_code_str}",
+                "ten_mon": subject_name if subject_name else f"Lớp {class_code_str}",
                 "semester": semester_str
             }).execute()
             class_id = new_class.data[0]["id"]
         else:
             class_id = class_res.data[0]["id"]
+            # Cập nhật tên môn nếu cần
+            if subject_name:
+                supabase.table("classes").update({"ten_mon": subject_name}).eq("id", class_id).execute()
             
         # 5. KẾT NỐI Sinh viên vào Lớp này (Bảng trung gian class_students)
         if students_data:
