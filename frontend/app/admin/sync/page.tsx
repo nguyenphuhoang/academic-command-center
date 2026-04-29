@@ -9,6 +9,8 @@ export default function AdminSyncPage() {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<{count: number, class_code: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(true);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
@@ -48,8 +50,36 @@ export default function AdminSyncPage() {
       setError("Lỗi kết nối máy chủ hoặc lỗi CORS.");
     } finally {
       setLoading(false);
+      fetchAllStudents();
     }
   };
+
+  const fetchAllStudents = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/students`);
+      if (res.ok) {
+        const data = await res.json();
+        setAllStudents(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch students", e);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useState(() => {
+    fetchAllStudents();
+  });
+
+  // Group students by class_code
+  const groupedStudents = allStudents.reduce((acc, student) => {
+    const code = student.class_code || "CHƯA PHÂN LỚP";
+    if (!acc[code]) acc[code] = [];
+    acc[code].push(student);
+    return acc;
+  }, {} as Record<string, any[]>);
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 min-h-screen bg-slate-50">
@@ -100,20 +130,12 @@ export default function AdminSyncPage() {
             </label>
           </div>
 
-          <ul className="space-y-3 mb-8 text-sm font-medium text-slate-500">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Tự động lấy Mã lớp tại ô B5
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Lấy danh sách sinh viên từ dòng 9
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Cập nhật thông tin MSSV, Họ tên
-            </li>
-          </ul>
+          <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 mb-8">
+            <p className="text-xs text-indigo-600 font-black uppercase tracking-widest mb-1">Công nghệ thông minh</p>
+            <p className="text-slate-600 text-xs leading-relaxed">
+              Hệ thống tự động quét tìm Mã lớp và danh sách sinh viên dựa trên cấu trúc file thực tế. Không cần điều chỉnh file mẫu.
+            </p>
+          </div>
 
           <button
             onClick={handleSync}
@@ -131,23 +153,56 @@ export default function AdminSyncPage() {
           </button>
         </div>
 
-        <div className="space-y-6">
-          {result && (
-            <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2.5rem] animate-in zoom-in duration-300">
-              <div className="flex items-center gap-4 mb-4 text-emerald-600">
-                <CheckCircle2 className="w-8 h-8" />
-                <h3 className="text-xl font-bold">Đồng bộ thành công!</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="bg-white/50 p-4 rounded-2xl">
-                  <p className="text-xs text-emerald-600/70 font-black uppercase tracking-widest mb-1">Mã lớp</p>
-                  <p className="text-2xl font-black text-emerald-900">{result.class_code}</p>
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 min-h-[400px]">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4 text-slate-800">
+                <div className="p-3 bg-slate-100 rounded-2xl">
+                  <Database className="w-8 h-8 text-slate-600" />
                 </div>
-                <div className="bg-white/50 p-4 rounded-2xl">
-                  <p className="text-xs text-emerald-600/70 font-black uppercase tracking-widest mb-1">Số lượng sinh viên</p>
-                  <p className="text-2xl font-black text-emerald-900">{result.count} em</p>
-                </div>
+                <h2 className="text-xl font-bold">Danh sách đã nạp</h2>
               </div>
+              <span className="bg-indigo-100 text-indigo-700 text-xs font-black px-3 py-1 rounded-full uppercase">
+                {allStudents.length} Sinh viên
+              </span>
+            </div>
+
+            {fetching ? (
+              <div className="flex flex-col items-center justify-center py-20 opacity-30">
+                <RefreshCcw className="w-10 h-10 animate-spin mb-4" />
+                <p className="font-bold">Đang tải dữ liệu...</p>
+              </div>
+            ) : Object.keys(groupedStudents).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 opacity-30 text-center">
+                <Database className="w-16 h-16 mb-4" />
+                <p className="font-bold">Chưa có dữ liệu nào được nạp</p>
+                <p className="text-sm">Vui lòng chọn file Excel và bấm Đồng bộ ở bên trái</p>
+              </div>
+            ) : (
+              <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {Object.entries(groupedStudents).map(([code, students]) => (
+                  <div key={code} className="border border-slate-100 rounded-3xl overflow-hidden">
+                    <div className="bg-slate-50 px-6 py-3 flex items-center justify-between border-b border-slate-100">
+                      <span className="font-black text-slate-700 text-sm">{code}</span>
+                      <span className="text-xs font-bold text-slate-400">{students.length} em</span>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      {students.slice(0, 5).map((s: any) => (
+                        <div key={s.mssv} className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500 font-medium">{s.mssv}</span>
+                          <span className="text-slate-800 font-bold">{s.name}</span>
+                        </div>
+                      ))}
+                      {students.length > 5 && (
+                        <p className="text-[10px] text-center text-slate-400 font-bold uppercase mt-2 pt-2 border-t border-slate-50">
+                          ... và {students.length - 5} sinh viên khác
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
             </div>
           )}
 

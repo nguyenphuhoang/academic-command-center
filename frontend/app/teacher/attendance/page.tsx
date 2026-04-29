@@ -78,20 +78,28 @@ export default function TeacherAttendancePage() {
   };
 
   useEffect(() => {
-    const fetchClasses = async () => {
+    const fetchClassesFromStudents = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/classes`);
+        // Lấy danh sách các mã lớp thực tế đang có sinh viên
+        const res = await fetch(`${API_URL}/api/admin/students`);
         if (res.ok) {
-          const data = await res.json();
-          setClasses(data);
+          const allStudents = await res.json();
+          // Lọc ra các mã lớp duy nhất
+          const uniqueClasses = Array.from(new Set(allStudents.map((s: any) => s.class_code)))
+            .map(code => ({
+              id: code, // Dùng mã lớp làm ID luôn cho tiện
+              ma_lop: code,
+              ten_mon: `Lớp HP: ${code}`
+            }));
+          setClasses(uniqueClasses);
         }
       } catch (err) {
-        console.error("Failed to fetch classes:", err);
+        console.error("Failed to fetch classes from students:", err);
       } finally {
         setFetchingClasses(false);
       }
     };
-    fetchClasses();
+    fetchClassesFromStudents();
   }, [API_URL]);
 
   // Real-time subscription
@@ -114,16 +122,40 @@ export default function TeacherAttendancePage() {
         (payload: any) => {
           const newRecord = payload.new;
           setStudentsStatus((prev) => {
+            // Kiểm tra xem sinh viên đã có trong danh sách hiện diện chưa
+            const isAlreadyPresent = prev.present.some(s => s.mssv === newRecord.mssv);
+            if (isAlreadyPresent) return prev;
+
+            // Tìm sinh viên trong danh sách vắng
             const studentIdx = prev.absent.findIndex(s => s.mssv === newRecord.mssv);
+            let studentInfo;
+
             if (studentIdx >= 0) {
-              const student = prev.absent[studentIdx];
-              const updatedStudent = { ...student, status: 'present', distance: newRecord.distance, timestamp: newRecord.created_at || new Date().toISOString() };
+              // Nếu có trong danh sách vắng, chuyển sang hiện diện
+              studentInfo = { 
+                ...prev.absent[studentIdx], 
+                status: 'present', 
+                distance: newRecord.distance, 
+                timestamp: newRecord.created_at || new Date().toISOString() 
+              };
               return {
-                present: [updatedStudent, ...prev.present],
+                present: [studentInfo, ...prev.present],
                 absent: prev.absent.filter((_, i) => i !== studentIdx)
               };
+            } else {
+              // Nếu KHÔNG có trong danh sách vắng (lỗi khớp mã lớp), vẫn cho hiện tên lên màn hình
+              studentInfo = {
+                mssv: newRecord.mssv,
+                name: "Sinh viên mới (Lệch mã lớp)", // Sẽ được cập nhật nếu tìm thấy trong DB sau
+                status: 'present',
+                distance: newRecord.distance,
+                timestamp: newRecord.created_at || new Date().toISOString()
+              };
+              return {
+                ...prev,
+                present: [studentInfo, ...prev.present]
+              };
             }
-            return prev;
           });
         }
       )
@@ -162,10 +194,7 @@ export default function TeacherAttendancePage() {
         // We keep the session in state but marked as inactive
         setSession({ ...session, status: "inactive" });
         
-        // Auto trigger download
-        handleExportAbsentees();
-        
-        alert(`Đã kết thúc buổi học!\n- Có mặt: ${data.present_count}\n- Vắng: ${data.absent_count}\nBáo cáo đã được tự động tải về.`);
+        alert(`Đã kết thúc buổi học!\n- Có mặt: ${data.present_count}\n- Vắng: ${data.absent_count}`);
       } else {
         const errData = await res.json();
         setError(errData.detail || "Không thể kết thúc buổi học.");
@@ -429,18 +458,25 @@ export default function TeacherAttendancePage() {
                 <p className="text-indigo-200 text-sm mt-2 font-medium">Trên tổng số {studentsStatus.present.length + studentsStatus.absent.length} sinh viên</p>
               </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleFinalizeSession}
-                    disabled={loading}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+                    disabled={loading || session.status !== "active"}
+                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><FileDown className="w-5 h-5" /> KẾT THÚC & TẢI BÁO CÁO</>}
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "KẾT THÚC PHIÊN"}
                   </button>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">
-                    Hệ thống sẽ tự động lọc sinh viên vắng và tải file báo cáo Excel.
-                  </p>
+                  
+                  <button
+                    onClick={handleExportAbsentees}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                  >
+                    <FileDown className="w-5 h-5" /> TẢI BÁO CÁO
+                  </button>
                 </div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase text-center mt-2">
+                  Bạn có thể tải báo cáo bất cứ lúc nào.
+                </p>
             </div>
 
             {/* Right Column: Live Grid */}

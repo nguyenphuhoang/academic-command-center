@@ -243,8 +243,25 @@ def create_attendance_session(session: SessionCreate):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
+        target_class_id = session.class_id
+        
+        # Nếu class_id gửi lên không phải UUID (mà là mã lớp như 225NMG03)
+        # thì ta đi tìm ID thực sự của nó trong bảng classes
+        if len(str(target_class_id)) < 20: # Heuristic check for non-UUID
+            class_res = supabase.table("classes").select("id").eq("ma_lop", str(target_class_id).strip()).execute()
+            if class_res.data:
+                target_class_id = class_res.data[0]["id"]
+            else:
+                # Nếu chưa có lớp này trong bảng classes, tạo mới luôn
+                new_class = supabase.table("classes").insert({
+                    "ma_lop": str(target_class_id).strip(),
+                    "ten_mon": f"Lớp {target_class_id}"
+                }).execute()
+                if new_class.data:
+                    target_class_id = new_class.data[0]["id"]
+
         response = supabase.table("attendance_sessions").insert({
-            "class_id": session.class_id,
+            "class_id": target_class_id,
             "teacher_lat": session.lat,
             "teacher_lng": session.lng,
             "status": "active"
@@ -428,7 +445,7 @@ async def finalize_attendance(session_id: str):
 
         # 2. Get all students for this class_code
         class_code = str(class_res.data["ma_lop"]).strip()
-        all_students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        all_students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
         all_students = all_students_res.data or []
 
         # 3. Get all present students for this session
@@ -477,10 +494,10 @@ def get_session_status(session_id: str):
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
             
         class_code = str(class_res.data["ma_lop"]).strip()
+        print(f"DEBUG: Fetching students for class_code: '{class_code}'") # Log để kiểm tra
         
-        # Get all students for this class_code
-        # We use .ilike to be case-insensitive and more flexible if needed
-        students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        # Get all students for this class_code - Use ilike for case-insensitive
+        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
         all_students = students_res.data or []
         
         # Get present students for this session
@@ -539,7 +556,7 @@ def export_absentees(session_id: str):
         class_name = class_res.data["ten_mon"]
         
         # 3. Get all students for this class_code
-        students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
         all_students = students_res.data or []
         
         # 4. Get present students for this session
@@ -597,6 +614,17 @@ def export_absentees(session_id: str):
             headers=headers
         )
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/students")
+def get_all_students():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # Get all students ordered by class and name
+        res = supabase.table("students").select("*").order("class_code").order("name").execute()
+        return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
