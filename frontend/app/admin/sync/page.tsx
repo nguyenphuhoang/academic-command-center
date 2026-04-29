@@ -83,9 +83,13 @@ export default function AdminSyncPage() {
   };
 
   const groupedStudents: Record<string, any[]> = allStudents.reduce((acc: Record<string, any[]>, student: any) => {
-    const code = student.class_code || "CHƯA PHÂN LỚP";
+    // API trả về classes { ma_lop: "..." }
+    const code = student.classes?.ma_lop || "CHƯA PHÂN LỚP";
     if (!acc[code]) acc[code] = [];
-    acc[code].push(student);
+    acc[code].push({
+      ...student,
+      name: student.students?.name || "N/A"
+    });
     return acc;
   }, {});
 

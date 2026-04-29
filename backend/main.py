@@ -779,7 +779,8 @@ def get_all_students(class_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
         # Truy vấn trực tiếp từ bảng liên kết class_students để đảm bảo tính nhất quán
-        query = supabase.table("class_students").select("mssv, students(*), classes(ma_lop)")
+        # Sử dụng select lồng nhau để lấy tên sinh viên và mã lớp
+        query = supabase.table("class_students").select("mssv, students(name), classes(ma_lop)")
         if class_id:
             query = query.eq("class_id", class_id)
             
