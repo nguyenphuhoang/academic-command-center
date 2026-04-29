@@ -412,7 +412,7 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
                 "mssv": str(mssv).strip(),
                 "name": name,
                 "email": str(email).strip(),
-                "class_code": str(class_code).strip()
+                "class_code": str(class_code).strip() # Sử dụng mã lớp chung từ tiêu đề
             })
 
         if not students_data:
@@ -499,16 +499,19 @@ def get_session_status(session_id: str):
         class_id = session_res.data["class_id"]
         
         # Get class_code
-        class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).single().execute()
-        if not class_res.data:
-            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
-            
-        class_code = str(class_res.data["ma_lop"]).strip()
-        print(f"DEBUG: Fetching students for class_code: '{class_code}'") # Log để kiểm tra
+        class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).execute()
         
-        # Get all students for this class_code - Use ilike for case-insensitive
-        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
-        all_students = students_res.data or []
+        all_students = []
+        if class_res.data:
+            class_code = str(class_res.data[0]["ma_lop"]).strip()
+            # Get all students for this class_code
+            students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
+            all_students = students_res.data or []
+        
+        # Fallback: Nếu vẫn không có SV nào, thử dùng chính class_id làm mã lớp (cho các session cũ)
+        if not all_students:
+            students_res = supabase.table("students").select("*").ilike("class_code", str(class_id).strip()).execute()
+            all_students = students_res.data or []
         
         # Get present students for this session
         records_res = supabase.table("attendance_records").select("mssv, distance, created_at").eq("session_id", session_id).execute()

@@ -447,7 +447,11 @@ export default function TeacherAttendancePage() {
               <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl text-white text-center">
                 <p className="text-indigo-100 font-bold uppercase tracking-widest text-xs mb-2">Số lượng hiện diện</p>
                 <p className="text-7xl font-black">{studentsStatus.present.length}</p>
-                <p className="text-indigo-200 text-sm mt-2 font-medium">Trên tổng số {studentsStatus.present.length + studentsStatus.absent.length} sinh viên</p>
+                <p className="text-indigo-200 text-sm mt-2 font-medium">
+                  Trên tổng số {studentsStatus.present.length + studentsStatus.absent.length > 0 
+                    ? studentsStatus.present.length + studentsStatus.absent.length 
+                    : "..."} sinh viên
+                </p>
               </div>
 
                 <div className="grid grid-cols-2 gap-3">
