@@ -19,6 +19,7 @@ export default function AdminSyncPage() {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com").replace(/\/$/, "");
 
   const fetchAllStudents = async () => {
+    setAllStudents([]); // Reset state to empty to avoid stale data
     setFetching(true);
     try {
       const res = await fetch(`${API_URL}/api/admin/students?t=${Date.now()}`, {

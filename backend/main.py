@@ -439,76 +439,58 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         if not processed_students:
             return {**stats, "detail": "Không có dữ liệu hợp lệ (Kiem tra lai MSSV dai 8-12 ky tu)."}
 
-        # 3. Database Sync (Relational Strategy)
+        # 3. Database Sync (Atomic Purge & Populate Strategy)
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         final_subject_name = subject_name if subject_name else "Chưa xác định"
         
-        # 3.1: Upsert Subject & Get subject_id
+        # 3.1: Get subject_id and class_id
         subject_id = None
         try:
-            import re
-            subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
-            subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
             sub_res = supabase.table("subjects").upsert({
                 "name": final_subject_name,
-                "code": subj_code,
+                "code": class_code_str, # Use full class code as fallback
                 "semester": semester_str
             }, on_conflict="name").execute()
-            
-            if sub_res.data:
-                subject_id = sub_res.data[0]["id"]
-        except Exception as e: 
-            print(f"Subject Sync Error: {e}")
+            if sub_res.data: subject_id = sub_res.data[0]["id"]
+        except: pass
 
-        # 3.2: Upsert Class with BOTH subject_id and ten_mon (to satisfy Not-Null constraint)
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
         if not class_res.data:
-            class_obj = supabase.table("classes").insert({
-                "ma_lop": class_code_str,
-                "subject_id": subject_id,
-                "ten_mon": final_subject_name, # Satisfy legacy constraint
-                "semester": semester_str
-            }).execute()
+            class_obj = supabase.table("classes").insert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}).execute()
             class_id = class_obj.data[0]["id"]
         else:
             class_id = class_res.data[0]["id"]
-            # Update both for consistency
-            supabase.table("classes").update({
-                "subject_id": subject_id,
-                "ten_mon": final_subject_name
-            }).eq("id", class_id).execute()
+            supabase.table("classes").update({"subject_id": subject_id, "ten_mon": final_subject_name}).eq("id", class_id).execute()
 
-        # 3.2: Batch Upsert Students (Information Table)
-        print(f"DEBUG: Bat dau Upsert {len(processed_students)} sinh vien vao bang students...")
-        for i in range(0, len(processed_students), 50):
-            batch = processed_students[i:i+50]
-            supabase.table("students").upsert(batch, on_conflict="mssv").execute()
-            
-        # 3.3: Batch Upsert Junction (Enrollment Table)
-        print(f"DEBUG: Bat dau lien ket {len(processed_students)} sinh vien vao lop {class_code_str}...")
-        junction_data = []
-        for s in processed_students:
-            # Debug log cho tung nguoi
-            # print(f"DEBUG: Lien ket {s['mssv']} vao class_id {class_id}")
-            junction_data.append({"class_id": class_id, "mssv": s["mssv"]})
-            
-        # Chia nho de Upsert cho chac chan
-        for i in range(0, len(junction_data), 50):
-            batch = junction_data[i:i+50]
-            supabase.table("class_students").upsert(batch, on_conflict="class_id, mssv").execute()
+        # 3.2: Atomic Purge - Xóa sạch liên kết cũ của lớp này
+        print(f"DEBUG: Atomic Purge - Dang xoa sach du lieu cu cua lop {class_code_str}")
+        supabase.table("class_students").delete().eq("class_id", class_id).execute()
 
-        stats["successfully_synced"] = len(processed_students)
-        print(f"DEBUG: Hoan tat dong bo. Database hien tai phai co {len(processed_students)} sinh vien cho lop nay.")
+        # 3.3: Bulk Populate Students (Update thông tin cá nhân)
+        print(f"DEBUG: Dang cap nhat thong tin cho {len(processed_students)} sinh vien")
+        supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
+            
+        # 3.4: Bulk Populate Junction (Liên kết vào lớp)
+        print(f"DEBUG: Bulk Insert - Dang nap {len(processed_students)} sinh vien vao lop {class_code_str}")
+        junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
+        supabase.table("class_students").insert(junction_data).execute()
+
+        # 3.5: Final Verification - Đếm trực tiếp từ Database
+        final_count_res = supabase.table("class_students").select("mssv", count="exact").eq("class_id", class_id).execute()
+        db_actual_count = final_count_res.count if final_count_res.count is not None else len(processed_students)
         
-        # Tam dung 1 giay de DB on dinh index
-        import time
-        time.sleep(1.0)
+        print(f"DEBUG: Xac nhan Database - Thuc te dang co {db_actual_count} sinh vien.")
         
-        return stats
+        return {
+            "total_rows_found": stats["total_rows_found"],
+            "successfully_synced": db_actual_count,
+            "errors": stats["errors"],
+            "class_code": class_code_str
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scientific Sync Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Atomic Sync Error: {str(e)}")
 
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):
