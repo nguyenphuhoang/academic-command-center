@@ -423,10 +423,10 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             if mssv or full_name:
                 print(f"DEBUG: Dang doc dong {row_idx}, MSSV: {mssv}, Ten: {full_name}")
 
-            # Step 2.2: Scientific Validation (8-12 characters for MSSV)
-            if len(mssv) < 8 or len(mssv) > 12 or not full_name or len(full_name) < 2:
+            # Step 2.2: Scientific Validation (8-15 characters for MSSV)
+            if len(mssv) < 8 or len(mssv) > 15 or not full_name or len(full_name) < 2:
                 if mssv or full_name:
-                    print(f"DEBUG: Bo qua dong {row_idx} do du lieu khong hop le (MSSV dai {len(mssv)})")
+                    print(f"DEBUG: Bo qua dong {row_idx} do du lieu khong hop le (MSSV: '{mssv}' dai {len(mssv)})")
                 stats["errors"] += 1
                 continue
             
