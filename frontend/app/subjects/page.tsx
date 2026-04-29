@@ -16,15 +16,7 @@ interface Subject {
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Form states
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [semester, setSemester] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   const handleDelete = async (id: string | number) => {
     if (!confirm("Bạn có chắc chắn muốn xóa học phần này? Toàn bộ dữ liệu điểm danh liên quan sẽ bị xóa.")) return;
@@ -76,53 +68,14 @@ export default function SubjectsPage() {
     sub.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !code || !semester) return;
 
-    setSubmitting(true);
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/subjects`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, code, semester }),
-      });
-
-      if (res.ok) {
-        setIsModalOpen(false);
-        setName("");
-        setCode("");
-        setSemester("");
-        fetchSubjects();
-      } else {
-        alert("Có lỗi xảy ra khi thêm môn học. Vui lòng thử lại.");
-      }
-    } catch (err) {
-      console.error("Error creating subject:", err);
-      alert("Không thể kết nối đến máy chủ Backend.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto relative">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900">Môn Học</h2>
-          <p className="text-slate-500 mt-2">Quản lý danh sách các môn học bạn đang phụ trách.</p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-        >
-          <Plus className="w-5 h-5" />
-          Thêm môn học
-        </button>
-      </header>
+      <div className="mb-10">
+        <h2 className="text-3xl font-black text-slate-900 mb-1">Danh sách các học phần</h2>
+        <p className="text-slate-500 font-medium">Các lớp học đã được đồng bộ từ hệ thống Excel.</p>
+      </div>
 
       {/* Search Bar */}
       <div className="relative mb-8">
@@ -150,15 +103,14 @@ export default function SubjectsPage() {
           <p className="text-slate-500 max-w-sm mx-auto mb-8">
             {searchTerm ? `Không có kết quả nào cho "${searchTerm}"` : "Bạn chưa thêm môn học nào vào hệ thống. Hãy bắt đầu ngay!"}
           </p>
-          <button
-            onClick={() => {
-              if (searchTerm) setSearchTerm("");
-              else setIsModalOpen(true);
-            }}
-            className="text-indigo-600 font-bold hover:text-indigo-700 transition-colors"
-          >
-            {searchTerm ? "Xóa tìm kiếm" : "+ Thêm môn học mới"}
-          </button>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="text-indigo-600 font-bold hover:text-indigo-700 transition-colors"
+            >
+              Xóa tìm kiếm
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -232,92 +184,6 @@ export default function SubjectsPage() {
         </div>
       )}
 
-      {/* Modal Overlay */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900">Thêm Môn Học Mới</h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-                    Tên môn học
-                  </label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="VD: Cấu trúc dữ liệu và Giải thuật"
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="code" className="block text-sm font-medium text-slate-700 mb-1">
-                    Mã môn học
-                  </label>
-                  <input
-                    id="code"
-                    type="text"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="VD: COMP1020"
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="semester" className="block text-sm font-medium text-slate-700 mb-1">
-                    Học kỳ
-                  </label>
-                  <input
-                    id="semester"
-                    type="text"
-                    value={semester}
-                    onChange={(e) => setSemester(e.target.value)}
-                    placeholder="VD: Học kỳ 1 - 2024"
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors disabled:opacity-70 flex justify-center items-center gap-2"
-                >
-                  {submitting ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Đang lưu...</>
-                  ) : (
-                    "Lưu môn học"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
