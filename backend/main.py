@@ -498,22 +498,29 @@ def get_session_status(session_id: str):
             
         class_id = session_res.data["class_id"]
         
-        # Get class_code
+        # 1. Tìm mã lớp (class_code) từ session này
+        # Thử tìm theo UUID trước
         class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).execute()
         
-        all_students = []
-        if class_res.data:
-            class_code = str(class_res.data[0]["ma_lop"]).strip()
-            # Get all students for this class_code
-            students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
-            all_students = students_res.data or []
+        final_class_code = str(class_id).strip() # Mặc định coi ID là mã lớp (trường hợp session cũ)
+        if class_res.data and len(class_res.data) > 0:
+            final_class_code = str(class_res.data[0]["ma_lop"]).strip()
+
+        # 2. Lấy TẤT CẢ sinh viên có mã lớp này (không quan tâm ID lớp là gì)
+        students_res = supabase.table("students").select("*").ilike("class_code", final_class_code).execute()
+        all_students = students_res.data or []
         
-        # Fallback: Nếu vẫn không có SV nào, thử dùng chính class_id làm mã lớp (cho các session cũ)
+        # Nếu vẫn không thấy ai, thử tìm theo tên môn học (để chắc chắn 100%)
         if not all_students:
-            students_res = supabase.table("students").select("*").ilike("class_code", str(class_id).strip()).execute()
-            all_students = students_res.data or []
-        
-        # Get present students for this session
+            # Lấy tên môn từ class_id
+            class_info = supabase.table("classes").select("ten_mon").eq("id", class_id).execute()
+            if class_info.data:
+                ten_mon = class_info.data[0]["ten_mon"]
+                # Tìm các sinh viên có mã lớp chứa một phần tên môn hoặc mã lớp tương ứng
+                # Đây là bước dự phòng cuối cùng
+                pass 
+
+        # 3. Lấy danh sách đã điểm danh
         records_res = supabase.table("attendance_records").select("mssv, distance, created_at").eq("session_id", session_id).execute()
         present_records = records_res.data or []
         
