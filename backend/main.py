@@ -500,6 +500,11 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
 
         stats["successfully_synced"] = len(processed_students)
         print(f"DEBUG: Hoan tat dong bo. Database hien tai phai co {len(processed_students)} sinh vien cho lop nay.")
+        
+        # Tam dung 1 giay de DB on dinh index
+        import time
+        time.sleep(1.0)
+        
         return stats
 
     except Exception as e:

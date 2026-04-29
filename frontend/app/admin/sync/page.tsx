@@ -21,7 +21,12 @@ export default function AdminSyncPage() {
   const fetchAllStudents = async () => {
     setFetching(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/students?t=${Date.now()}`);
+      const res = await fetch(`${API_URL}/api/admin/students?t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setAllStudents(data);
@@ -59,7 +64,10 @@ export default function AdminSyncPage() {
       if (res.ok) {
         const data = await res.json();
         setResult(data);
-        fetchAllStudents();
+        // Doi 1.5 giay de Database kịp cập nhật hoàn toàn
+        setTimeout(() => {
+          fetchAllStudents();
+        }, 1500);
       } else {
         const errData = await res.json().catch(() => ({ detail: "Đồng bộ thất bại" }));
         setError(errData.detail || "Đồng bộ thất bại.");
