@@ -406,19 +406,21 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         if not class_code:
             class_code = sheet.cell(row=1, column=5).value or "UNKNOWN"
 
-        # 2. Read Student Data (Robust Loop)
+        # 2. Read Student Data (Super Robust Loop)
         students_data = []
-        for row_idx in range(start_row, sheet.max_row + 200): # Scan up to 200 rows beyond max_row to be safe
+        # Quét tối đa 1000 dòng để chắc chắn không bỏ sót bất kỳ ai
+        for row_idx in range(start_row, 1000):
             mssv_val = sheet.cell(row=row_idx, column=2).value
+            
+            # Nếu gặp 1 dòng trống, ta không dừng lại ngay mà kiểm tra xem 20 dòng tiếp theo có ai không
             if not mssv_val:
-                # If we hit 10 empty rows in a row, stop
-                empty_streak = 0
-                for k in range(1, 11):
-                    if sheet.cell(row=row_idx + k, column=2).value:
+                has_more = False
+                for next_r in range(1, 21):
+                    if sheet.cell(row=row_idx + next_r, column=2).value:
+                        has_more = True
                         break
-                    empty_streak += 1
-                if empty_streak >= 10:
-                    break
+                if not has_more:
+                    break # Thực sự hết dữ liệu
                 continue
             
             mssv = str(mssv_val).strip()
