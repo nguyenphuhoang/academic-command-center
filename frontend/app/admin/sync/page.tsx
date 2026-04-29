@@ -22,7 +22,9 @@ export default function AdminSyncPage() {
     setAllStudents([]); // Reset state to empty to avoid stale data
     setFetching(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/students?t=${Date.now()}`, {
+      // Su dung version ngau nhien cuc manh de pha vo moi loai cache
+      const v = Math.random().toString(36).substring(7);
+      const res = await fetch(`${API_URL}/api/admin/students?v=${v}&t=${Date.now()}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'

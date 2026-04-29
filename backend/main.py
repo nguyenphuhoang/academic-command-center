@@ -439,58 +439,42 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         if not processed_students:
             return {**stats, "detail": "Không có dữ liệu hợp lệ (Kiem tra lai MSSV dai 8-12 ky tu)."}
 
-        # 3. Database Sync (Atomic Purge & Populate Strategy)
+        # 3. Database Sync (Martial Law Strategy)
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         final_subject_name = subject_name if subject_name else "Chưa xác định"
         
-        # 3.1: Get subject_id and class_id
-        subject_id = None
-        try:
-            sub_res = supabase.table("subjects").upsert({
-                "name": final_subject_name,
-                "code": class_code_str, # Use full class code as fallback
-                "semester": semester_str
-            }, on_conflict="name").execute()
-            if sub_res.data: subject_id = sub_res.data[0]["id"]
-        except: pass
+        # 3.1: Upsert Subject & Class
+        sub_res = supabase.table("subjects").upsert({"name": final_subject_name, "code": class_code_str, "semester": semester_str}, on_conflict="name").execute()
+        subject_id = sub_res.data[0]["id"] if sub_res.data else None
+        
+        class_res = supabase.table("classes").upsert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}, on_conflict="ma_lop, semester").execute()
+        class_id = class_res.data[0]["id"]
 
-        class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
-        if not class_res.data:
-            class_obj = supabase.table("classes").insert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}).execute()
-            class_id = class_obj.data[0]["id"]
-        else:
-            class_id = class_res.data[0]["id"]
-            supabase.table("classes").update({"subject_id": subject_id, "ten_mon": final_subject_name}).eq("id", class_id).execute()
-
-        # 3.2: Atomic Purge - Xóa sạch liên kết cũ của lớp này
-        print(f"DEBUG: Atomic Purge - Dang xoa sach du lieu cu cua lop {class_code_str}")
-        supabase.table("class_students").delete().eq("class_id", class_id).execute()
-
-        # 3.3: Bulk Populate Students (Update thông tin cá nhân)
-        print(f"DEBUG: Dang cap nhat thong tin cho {len(processed_students)} sinh vien")
+        # 3.2: Bulk Upsert Students (Thông tin cá nhân)
+        print(f"DEBUG: Thiet quan luat - Dang nạp {len(processed_students)} sinh vien vào students")
         supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
             
-        # 3.4: Bulk Populate Junction (Liên kết vào lớp)
-        print(f"DEBUG: Bulk Insert - Dang nap {len(processed_students)} sinh vien vao lop {class_code_str}")
+        # 3.3: Bulk Insert Junction (Liên kết lớp)
+        print(f"DEBUG: Thiet quan luat - Dang lien ket {len(processed_students)} sinh vien vao lop {class_code_str}")
         junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
-        supabase.table("class_students").insert(junction_data).execute()
+        supabase.table("class_students").upsert(junction_data, on_conflict="class_id, mssv").execute()
 
-        # 3.5: Final Verification - Đếm trực tiếp từ Database
-        final_count_res = supabase.table("class_students").select("mssv", count="exact").eq("class_id", class_id).execute()
-        db_actual_count = final_count_res.count if final_count_res.count is not None else len(processed_students)
+        # 3.4: Verification - Truy vấn trực tiếp từ bảng liên kết (KHÔNG DÙNG CACHE)
+        check_res = supabase.table("class_students").select("mssv").eq("class_id", class_id).execute()
+        actual_count = len(check_res.data) if check_res.data else 0
         
-        print(f"DEBUG: Xac nhan Database - Thuc te dang co {db_actual_count} sinh vien.")
+        print(f"DEBUG: Ket qua thuc te trong DB: {actual_count} sinh vien cho lop {class_code_str}")
         
         return {
             "total_rows_found": stats["total_rows_found"],
-            "successfully_synced": db_actual_count,
+            "successfully_synced": actual_count,
             "errors": stats["errors"],
             "class_code": class_code_str
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Atomic Sync Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Martial Law Sync Error: {str(e)}")
 
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):
@@ -774,31 +758,32 @@ def export_semester_report(class_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/students")
-def get_all_students():
+def get_all_students(class_id: Optional[str] = None):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Truy vấn sinh viên kèm theo thông tin lớp học từ bảng trung gian
-        res = supabase.table("students").select("*, class_students(classes(ma_lop))").order("name").execute()
-        
-        # Format lại dữ liệu để tương thích với Frontend
-        students = []
-        for s in (res.data or []):
-            class_code = None
-            if s.get("class_students") and len(s["class_students"]) > 0:
-                class_info = s["class_students"][0].get("classes")
-                if class_info:
-                    class_code = class_info.get("ma_lop")
+        # Truy vấn trực tiếp từ bảng liên kết class_students để đảm bảo tính nhất quán
+        query = supabase.table("class_students").select("mssv, students(*), classes(ma_lop)")
+        if class_id:
+            query = query.eq("class_id", class_id)
             
-            student_data = {
+        res = query.execute()
+        data = res.data or []
+        
+        print(f"DEBUG: Database tim thay {len(data)} sinh vien cho truy van nay.")
+        
+        students = []
+        for item in data:
+            s = item.get("students")
+            if not s: continue
+            
+            students.append({
                 "mssv": s["mssv"],
                 "name": s["name"],
                 "email": s.get("email"),
-                "device_id": s.get("device_id"),
-                "created_at": s.get("created_at"),
-                "class_code": class_code
-            }
-            students.append(student_data)
+                "device_id": s.get("current_device_id"),
+                "class_code": item.get("classes", {}).get("ma_lop") if item.get("classes") else "N/A"
+            })
             
         return students
     except Exception as e:
