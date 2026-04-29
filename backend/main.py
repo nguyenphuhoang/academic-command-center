@@ -455,10 +455,11 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         print(f"DEBUG: Thiet quan luat - Dang nạp {len(processed_students)} sinh vien vào students")
         supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
             
-        # 3.3: Bulk Insert Junction (Liên kết lớp)
+        # 3.3: Bulk Upsert Junction (Liên kết lớp với UNIQUE constraint mới)
         print(f"DEBUG: Thiet quan luat - Dang lien ket {len(processed_students)} sinh vien vao lop {class_code_str}")
         junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
-        supabase.table("class_students").upsert(junction_data, on_conflict="class_id, mssv").execute()
+        # Sử dụng on_conflict='class_id,mssv' không có khoảng trắng để khớp chính xác với constraint
+        supabase.table("class_students").upsert(junction_data, on_conflict="class_id,mssv").execute()
 
         # 3.4: Verification - Truy vấn trực tiếp từ bảng liên kết (KHÔNG DÙNG CACHE)
         check_res = supabase.table("class_students").select("mssv").eq("class_id", class_id).execute()
