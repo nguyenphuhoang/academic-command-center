@@ -442,19 +442,23 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         # 4.1 Đảm bảo Môn học (Subject) tồn tại
         subject_id = None
         if subject_name:
-            # Derive a subject code from class_code (e.g. 225CHKCHST02 -> CHKCHST)
-            import re
-            subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
-            subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
-            
-            sub_res = supabase.table("subjects").upsert({
-                "name": subject_name,
-                "code": subj_code,
-                "semester": semester_str
-            }, on_conflict="name").execute()
-            
-            if sub_res.data:
-                subject_id = sub_res.data[0]["id"]
+            try:
+                # Derive a subject code from class_code (e.g. 225CHKCHST02 -> CHKCHST)
+                import re
+                subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
+                subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
+                
+                sub_res = supabase.table("subjects").upsert({
+                    "name": subject_name,
+                    "code": subj_code,
+                    "semester": semester_str
+                }, on_conflict="name").execute()
+                
+                if sub_res.data:
+                    subject_id = sub_res.data[0]["id"]
+            except Exception as sub_err:
+                # Nếu bảng subjects chưa tồn tại, ta bỏ qua nhưng vẫn tiếp tục đồng bộ lớp
+                print(f"Warning: Could not sync subject '{subject_name}': {str(sub_err)}")
 
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
         
