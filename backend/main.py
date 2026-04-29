@@ -446,8 +446,12 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             class_id = class_res.data[0]["id"]
             
         # 5. KẾT NỐI Sinh viên vào Lớp này (Bảng trung gian class_students)
-        links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
-        supabase.table("class_students").upsert(links, on_conflict="class_id,mssv").execute()
+        if students_data:
+            links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
+            # Sử dụng từng cụm nhỏ để tránh lỗi timeout nếu danh sách quá dài
+            for i in range(0, len(links), 50):
+                chunk = links[i:i + 50]
+                supabase.table("class_students").upsert(chunk).execute()
         
         return {"status": "success", "count": len(students_data), "class_code": class_code_str, "semester": semester_str}
     except Exception as e:
