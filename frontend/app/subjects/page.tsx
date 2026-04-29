@@ -49,11 +49,16 @@ export default function SubjectsPage() {
     setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/subjects`);
+      const res = await fetch(`${apiUrl}/api/classes`); // Lấy từ bảng classes thực tế
       if (res.ok) {
         const data = await res.json();
-        // Reverse array so newest is typically first
-        setSubjects(Array.isArray(data) ? data.reverse() : []);
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          name: item.ten_mon,
+          code: item.ma_lop,
+          semester: item.semester || "---"
+        }));
+        setSubjects(mappedData.reverse());
       }
     } catch (err) {
       console.error("Failed to fetch subjects:", err);
