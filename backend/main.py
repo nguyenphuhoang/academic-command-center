@@ -475,22 +475,22 @@ async def finalize_attendance(session_id: str):
         class_res = supabase.table("classes").select("*").eq("id", class_id).single().execute()
         class_name = class_res.data["ten_mon"] if class_res.data else "Lớp học"
 
-        # 2. Get all students for this class_code
-        class_code = str(class_res.data["ma_lop"]).strip()
-        all_students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
-        all_students = all_students_res.data or []
+        # 2. Get all students for this class from class_students junction table
+        students_res = supabase.table("class_students").select("mssv").eq("class_id", class_id).execute()
+        all_students_mssvs = [s["mssv"] for s in (students_res.data or [])]
 
         # 3. Get all present students for this session
         present_res = supabase.table("attendance_records").select("mssv").eq("session_id", session_id).execute()
         present_mssvs = {r["mssv"] for r in present_res.data}
 
         # 4. Find absent students
-        absent_students = [s for s in all_students if s["mssv"] not in present_mssvs]
+        absent_count = len(all_students_mssvs) - len(present_mssvs)
+        if absent_count < 0: absent_count = 0 # Safety check
 
         return {
             "status": "success",
             "present_count": len(present_mssvs),
-            "absent_count": len(absent_students)
+            "absent_count": absent_count
         }
 
     except Exception as e:
@@ -578,9 +578,14 @@ def export_absentees(session_id: str):
         class_code = str(class_res.data["ma_lop"]).strip()
         class_name = class_res.data["ten_mon"]
         
-        # 3. Get all students for this class_code
-        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
-        all_students = students_res.data or []
+        # 3. Get all students for this class from class_students junction table
+        students_res = supabase.table("class_students").select("mssv, students(name)").eq("class_id", class_id).execute()
+        all_students = []
+        for item in (students_res.data or []):
+            all_students.append({
+                "mssv": item["mssv"],
+                "name": item["students"]["name"] if item.get("students") else "N/A"
+            })
         
         # 4. Get present students for this session
         records_res = supabase.table("attendance_records").select("mssv").eq("session_id", session_id).execute()
@@ -649,6 +654,10 @@ def export_semester_report(class_id: str):
         class_res = supabase.table("classes").select("ma_lop", "ten_mon").eq("id", class_id).single().execute()
         if not class_res.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+            
+        class_code = class_res.data["ma_lop"]
+        class_name = class_res.data["ten_mon"]
+
         # 2. Lấy danh sách sinh viên THỰC TẾ của lớp này (Từ bảng kết nối class_students)
         # Truy vấn join: class_students -> students
         students_res = supabase.table("class_students").select("mssv, students(name)").eq("class_id", class_id).execute()
@@ -734,9 +743,29 @@ def get_all_students():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Lấy tất cả sinh viên, sắp xếp theo tên
-        res = supabase.table("students").select("*").order("name").execute()
-        return res.data or []
+        # Truy vấn sinh viên kèm theo thông tin lớp học từ bảng trung gian
+        res = supabase.table("students").select("*, class_students(classes(ma_lop))").order("name").execute()
+        
+        # Format lại dữ liệu để tương thích với Frontend
+        students = []
+        for s in (res.data or []):
+            class_code = None
+            if s.get("class_students") and len(s["class_students"]) > 0:
+                class_info = s["class_students"][0].get("classes")
+                if class_info:
+                    class_code = class_info.get("ma_lop")
+            
+            student_data = {
+                "mssv": s["mssv"],
+                "name": s["name"],
+                "email": s.get("email"),
+                "device_id": s.get("device_id"),
+                "created_at": s.get("created_at"),
+                "class_code": class_code
+            }
+            students.append(student_data)
+            
+        return students
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

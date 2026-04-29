@@ -9,9 +9,9 @@ Bản tóm tắt này giúp AI nắm bắt nhanh bối cảnh dự án khi bắt
 ## 2. Các tính năng đã hoàn thiện
 - [x] **Điểm danh Real-time:** Kiểm tra GPS (100m) và Device ID (Chống gian lận).
 - [x] **Quản lý thiết bị:** Reset `current_device_id` cho sinh viên.
-- [x] **Báo cáo:** Xuất danh sách sinh viên vắng mặt ra file Excel (.xlsx).
+- [x] **Báo cáo:** Xuất danh sách sinh viên vắng mặt ra file Excel (.xlsx) dựa trên bảng liên kết `class_students`.
 - [x] **Admin Sync:** Cho phép Giảng viên tải file Excel phòng đào tạo lên để cập nhật danh sách sinh viên vào database (Tự động nhận diện mã lớp ở ô B5).
-- [x] **UI/UX:** Giao diện Dashboard giáo viên, trang điểm danh sinh viên, trang quản trị đồng bộ.
+- [x] **UI/UX:** Giao diện Dashboard giáo viên, trang điểm danh sinh viên, trang quản trị đồng bộ. Đã sửa lỗi đồng bộ API Frontend/Backend.
 
 ## 3. Cấu hình Quan trọng
 - **Backend URL:** `https://academic-command-center.onrender.com`

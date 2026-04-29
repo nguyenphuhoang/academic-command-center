@@ -50,7 +50,7 @@ export default function TeacherAttendancePage() {
   const fetchSessionStatus = useCallback(async (sessionId: string) => {
     setLoadingStatus(true);
     try {
-      const res = await fetch(`${API_URL}/api/attendance/sessions/${sessionId}/status`);
+      const res = await fetch(`${API_URL}/api/attendance/session/${sessionId}`);
       if (res.ok) {
         const data = await res.json();
         setStudentsStatus(data);
