@@ -71,12 +71,12 @@ export default function AdminSyncPage() {
     }
   };
 
-  const groupedStudents = allStudents.reduce((acc, student) => {
+  const groupedStudents: Record<string, any[]> = allStudents.reduce((acc: Record<string, any[]>, student: any) => {
     const code = student.class_code || "CHƯA PHÂN LỚP";
     if (!acc[code]) acc[code] = [];
     acc[code].push(student);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {});
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 min-h-screen bg-slate-50">
