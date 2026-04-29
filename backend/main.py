@@ -401,31 +401,43 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         if not class_code:
             class_code = sheet.cell(row=1, column=5).value or "UNKNOWN_CLASS"
 
-        # 2. Scientific Data Cleaning
+        # 2. Scientific Data Cleaning (Full Scan Approach)
         processed_students = []
         stats = {"total_rows_found": 0, "successfully_synced": 0, "errors": 0}
+        
+        # Quét toàn bộ từ dòng bắt đầu đến dòng cuối cùng của Sheet
+        print(f"DEBUG: Bat dau quet tu dong {start_row} den {sheet.max_row}")
         
         for row_idx in range(start_row, sheet.max_row + 1):
             stats["total_rows_found"] += 1
             
-            # Step 2.1: Extraction & Stripping
+            # Step 2.1: Extraction & Extreme Cleaning
             mssv_raw = sheet.cell(row=row_idx, column=2).value
-            mssv = str(mssv_raw or "").strip()
+            # Chi lay cac ky tu la so (Giai quyet loi 2415.0 -> 2415)
+            mssv = "".join(filter(str.isdigit, str(mssv_raw or "")))
             
             first_name = str(sheet.cell(row=row_idx, column=3).value or "").strip()
             last_name = str(sheet.cell(row=row_idx, column=4).value or "").strip()
             full_name = f"{first_name} {last_name}".strip()
             
-            # Step 2.2: Scientific Validation
-            if not mssv.isdigit() or len(mssv) < 5 or not full_name or len(full_name) < 2:
+            if mssv or full_name:
+                print(f"DEBUG: Dang doc dong {row_idx}, MSSV: {mssv}, Ten: {full_name}")
+
+            # Step 2.2: Scientific Validation (8-12 characters for MSSV)
+            if len(mssv) < 8 or len(mssv) > 12 or not full_name or len(full_name) < 2:
+                if mssv or full_name:
+                    print(f"DEBUG: Bo qua dong {row_idx} do du lieu khong hop le (MSSV dai {len(mssv)})")
                 stats["errors"] += 1
                 continue
             
             email = str(sheet.cell(row=row_idx, column=6).value or f"{mssv}@student.edu.vn").strip()
             processed_students.append({"mssv": mssv, "name": full_name, "email": email})
+            print(f"DEBUG: -> NHAT DUOC: {mssv} - {full_name}")
+
+        print(f"DEBUG: Ket thuc quet. Tong so sinh vien nhat duoc: {len(processed_students)}")
 
         if not processed_students:
-            return {**stats, "detail": "Không có dữ liệu hợp lệ."}
+            return {**stats, "detail": "Không có dữ liệu hợp lệ (Kiem tra lai MSSV dai 8-12 ky tu)."}
 
         # 3. Database Sync (Relational Strategy)
         class_code_str = str(class_code).strip()
