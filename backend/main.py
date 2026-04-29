@@ -430,37 +430,42 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         # 3. Database Sync (Relational Strategy)
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
+        final_subject_name = subject_name if subject_name else "Chưa xác định"
         
         # 3.1: Upsert Subject & Get subject_id
         subject_id = None
-        if subject_name:
-            try:
-                import re
-                subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
-                subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
-                sub_res = supabase.table("subjects").upsert({
-                    "name": subject_name,
-                    "code": subj_code,
-                    "semester": semester_str
-                }, on_conflict="name").execute()
-                
-                if sub_res.data:
-                    subject_id = sub_res.data[0]["id"]
-            except Exception as e: 
-                print(f"Subject Sync Error: {e}")
+        try:
+            import re
+            subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
+            subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
+            sub_res = supabase.table("subjects").upsert({
+                "name": final_subject_name,
+                "code": subj_code,
+                "semester": semester_str
+            }, on_conflict="name").execute()
+            
+            if sub_res.data:
+                subject_id = sub_res.data[0]["id"]
+        except Exception as e: 
+            print(f"Subject Sync Error: {e}")
 
-        # 3.2: Upsert Class with subject_id
+        # 3.2: Upsert Class with BOTH subject_id and ten_mon (to satisfy Not-Null constraint)
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
         if not class_res.data:
             class_obj = supabase.table("classes").insert({
                 "ma_lop": class_code_str,
                 "subject_id": subject_id,
+                "ten_mon": final_subject_name, # Satisfy legacy constraint
                 "semester": semester_str
             }).execute()
             class_id = class_obj.data[0]["id"]
         else:
             class_id = class_res.data[0]["id"]
-            supabase.table("classes").update({"subject_id": subject_id}).eq("id", class_id).execute()
+            # Update both for consistency
+            supabase.table("classes").update({
+                "subject_id": subject_id,
+                "ten_mon": final_subject_name
+            }).eq("id", class_id).execute()
 
         # 3.3: Batch Upsert Students
         for i in range(0, len(processed_students), 100):
