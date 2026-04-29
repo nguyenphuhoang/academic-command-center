@@ -83,13 +83,10 @@ export default function AdminSyncPage() {
   };
 
   const groupedStudents: Record<string, any[]> = allStudents.reduce((acc: Record<string, any[]>, student: any) => {
-    // API trả về classes { ma_lop: "..." }
-    const code = student.classes?.ma_lop || "CHƯA PHÂN LỚP";
+    // API trả về mssv, name, ma_lop (phẳng)
+    const code = student.ma_lop || "SINH VIÊN TỰ DO";
     if (!acc[code]) acc[code] = [];
-    acc[code].push({
-      ...student,
-      name: student.students?.name || "N/A"
-    });
+    acc[code].push(student);
     return acc;
   }, {});
 
@@ -98,7 +95,7 @@ export default function AdminSyncPage() {
   const filteredGroupedStudents = Object.entries(groupedStudents).reduce((acc: any, [code, students]) => {
     const filtered = students.filter(s => 
       s.mssv.toLowerCase().includes(studentSearch.toLowerCase()) || 
-      s.name.toLowerCase().includes(studentSearch.toLowerCase())
+      (s.name && s.name.toLowerCase().includes(studentSearch.toLowerCase()))
     );
     if (filtered.length > 0) acc[code] = filtered;
     return acc;

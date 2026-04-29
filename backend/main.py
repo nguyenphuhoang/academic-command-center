@@ -782,14 +782,6 @@ def export_semester_report(class_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/students")
-def get_all_students(class_id: Optional[str] = None):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
-    try:
-        # Truy vấn trực tiếp từ bảng liên kết class_students để đảm bảo tính nhất quán
-        # Sử dụng select lồng nhau để lấy tên sinh viên và mã lớp
-        query = supabase.table("class_students").select("mssv, students(name), classes(ma_lop)")
-        if class_id:
             query = query.eq("class_id", class_id)
             
         res = query.execute()
