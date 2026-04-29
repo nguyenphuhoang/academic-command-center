@@ -207,6 +207,20 @@ export default function TeacherAttendancePage() {
     }
   };
 
+  const handleResetDevice = async (mssv: string) => {
+    if (!confirm(`Reset thiết bị cho sinh viên ${mssv}?\nSau khi reset, sinh viên có thể dùng máy mới để điểm danh.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/students/${mssv}/reset-device`, { method: "PATCH" });
+      if (res.ok) {
+        alert(`✅ Đã reset thiết bị cho SV ${mssv}.`);
+      } else {
+        alert(`❌ Không thể reset. Vui lòng thử lại.`);
+      }
+    } catch {
+      alert("Lỗi kết nối máy chủ.");
+    }
+  };
+
   const handleStartAttendance = () => {
     if (!selectedClassId) {
       setError("Vui lòng chọn lớp học.");
