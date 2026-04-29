@@ -62,21 +62,6 @@ export default function TeacherAttendancePage() {
     }
   }, [API_URL]);
 
-  const handleResetDevice = async (mssv: string) => {
-    if (!confirm(`Bạn có chắc muốn reset khóa thiết bị cho MSSV ${mssv}?`)) return;
-    try {
-      const res = await fetch(`${API_URL}/api/students/${mssv}/reset-device`, { method: "PATCH" });
-      if (res.ok) {
-        alert(`Đã reset thiết bị cho ${mssv} thành công!`);
-      } else {
-        const err = await res.json();
-        alert("Lỗi: " + err.detail);
-      }
-    } catch (e) {
-      alert("Lỗi kết nối máy chủ.");
-    }
-  };
-
   useEffect(() => {
     const fetchClassesFromStudents = async () => {
       try {
@@ -85,12 +70,12 @@ export default function TeacherAttendancePage() {
         if (res.ok) {
           const allStudents = await res.json();
           // Lọc ra các mã lớp duy nhất
-          const uniqueClasses = Array.from(new Set(allStudents.map((s: any) => s.class_code)))
-            .map(code => ({
-              id: code, // Dùng mã lớp làm ID luôn cho tiện
-              ma_lop: code,
-              ten_mon: `Lớp HP: ${code}`
-            }));
+          const codes: string[] = Array.from(new Set<string>(allStudents.map((s: any) => String(s.class_code))));
+          const uniqueClasses = codes.map((code: string) => ({
+            id: code,
+            ma_lop: code,
+            ten_mon: `Lớp HP: ${code}`
+          }));
           setClasses(uniqueClasses);
         }
       } catch (err) {
