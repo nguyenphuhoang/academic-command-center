@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Optional
 import math
-import pandas as pd
+# import pandas as pd (Removed for lightness)
 from datetime import datetime
 import io
 
@@ -334,6 +334,8 @@ def update_attendance_session_status(session_id: str, status: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+import openpyxl
+
 @app.post("/api/admin/sync-students")
 async def sync_students_from_excel(file: UploadFile = File(...)):
     if not supabase:
@@ -344,37 +346,40 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         contents = await file.read()
         buffer = io.BytesIO(contents)
 
-        # Read Class Code from B5
-        header_df = pd.read_excel(buffer, header=None, nrows=6)
-        # Reset buffer for the next read
-        buffer.seek(0)
-        
-        class_code = header_df.iloc[4, 1] # B5 (index 4, 1)
+        # Load workbook using openpyxl (much lighter than pandas)
+        wb = openpyxl.load_workbook(buffer, data_only=True)
+        sheet = wb.active
 
-        # Read Student Data starting from row 9 (index 8)
-        df = pd.read_excel(buffer, skiprows=8)
-        
+        # Read Class Code from B5 (row 5, column 2)
+        class_code = sheet.cell(row=5, column=2).value
+        if not class_code:
+            raise HTTPException(status_code=400, detail="Không tìm thấy mã lớp tại ô B5.")
+
+        # Read Student Data starting from row 9
         students_data = []
-        for index, row in df.iterrows():
-            if pd.isna(row.iloc[1]): break # End of list
+        for row in range(9, sheet.max_row + 1):
+            mssv = sheet.cell(row=row, column=2).value
+            if not mssv: break # End of list
             
-            mssv = str(row.iloc[1]).strip()
-            first_name = str(row.iloc[2]).strip()
-            last_name = str(row.iloc[3]).strip()
-            name = f"{first_name} {last_name}"
+            first_name = sheet.cell(row=row, column=3).value or ""
+            last_name = sheet.cell(row=row, column=4).value or ""
+            name = f"{str(first_name).strip()} {str(last_name).strip()}".strip()
             
             students_data.append({
-                "mssv": mssv,
+                "mssv": str(mssv).strip(),
                 "name": name,
-                "class_code": class_code
+                "class_code": str(class_code).strip()
             })
+
+        if not students_data:
+            raise HTTPException(status_code=400, detail="Không tìm thấy dữ liệu sinh viên từ dòng 9.")
 
         # Upsert into students table
         res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
         
-        return {"status": "success", "count": len(students_data), "class_code": class_code}
+        return {"status": "success", "count": len(students_data), "class_code": str(class_code).strip()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file Excel: {str(e)}")
 
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):
@@ -516,26 +521,31 @@ def export_absentees(session_id: str):
         # 5. Filter absent students
         absent_students = [s for s in all_students if s["mssv"] not in present_mssvs]
         
-        # 6. Create DataFrame
-        if not absent_students:
-            df = pd.DataFrame([{"Thông báo": "Lớp đi đủ 100%"}])
-        else:
-            data = []
-            for i, student in enumerate(absent_students, 1):
-                data.append({
-                    "STT": i,
-                    "MSSV": student.get("mssv", ""),
-                    "Họ Tên": student.get("name", ""),
-                    "Tên Lớp": class_name,
-                    "Trạng Thái": "Vắng"
-                })
-            df = pd.DataFrame(data)
-            
-        # 7. Write to BytesIO
+        # 6. Create Excel using openpyxl
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='VangMat')
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "VangMat"
         
+        if not absent_students:
+            ws.append(["Thông báo"])
+            ws.append(["Lớp đi đủ 100%"])
+        else:
+            # Add Headers
+            headers_list = ["STT", "MSSV", "Họ Tên", "Tên Lớp", "Trạng Thái"]
+            ws.append(headers_list)
+            
+            # Add Data
+            for i, student in enumerate(absent_students, 1):
+                ws.append([
+                    i,
+                    student.get("mssv", ""),
+                    student.get("name", ""),
+                    class_name,
+                    "Vắng"
+                ])
+        
+        wb.save(output)
         output.seek(0)
         
         # 8. Setup Response
