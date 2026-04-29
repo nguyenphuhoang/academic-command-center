@@ -479,7 +479,10 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         print(f"DEBUG: Thiet quan luat - Dang nạp {len(processed_students)} sinh vien vào students")
         supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
             
-        # 3.3: Bulk Upsert Junction (Sử dụng UNIQUE CONSTRAINT: class_id, mssv)
+        # 3.3: Bulk Upsert Junction (Chiến thuật: Xóa sạch liên kết cũ của lớp này trước khi nạp mới)
+        print(f"DEBUG: Tong ve sinh - Dang xoa danh sach cu cua lop {class_code_str}")
+        supabase.table("class_students").delete().eq("class_id", class_id).execute()
+        
         print(f"DEBUG: Thiet quan luat - Dang lien ket {len(processed_students)} sinh vien vao lop {class_code_str}")
         junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
         supabase.table("class_students").upsert(junction_data, on_conflict="class_id,mssv").execute()
@@ -786,30 +789,32 @@ def get_all_students():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Truy vấn từ bảng students và join với class_students để lấy mã lớp
-        res = supabase.table("students").select("mssv, name, class_students(classes(ma_lop))").execute()
+        # 1. Lấy tất cả sinh viên (để tìm sinh viên tự do)
+        all_s = supabase.table("students").select("mssv, name").execute()
         
+        # 2. Lấy tất cả liên kết lớp
+        junctions = supabase.table("class_students").select("mssv, classes(ma_lop)").execute()
+        
+        # 3. Tạo map để tra cứu mã lớp theo mssv
+        class_map = {}
+        for j in junctions.data:
+            if j.get("classes"):
+                class_map[j["mssv"]] = j["classes"].get("ma_lop")
+        
+        # 4. Tổng hợp dữ liệu phẳng
         flattened_data = []
-        for s in res.data:
-            ma_lop = None
-            if s.get("class_students") and len(s["class_students"]) > 0:
-                # Tìm mã lớp hợp lệ đầu tiên
-                for cs in s["class_students"]:
-                    if cs.get("classes"):
-                        ma_lop = cs["classes"].get("ma_lop")
-                        break
-            
+        for s in all_s.data:
             flattened_data.append({
                 "mssv": s["mssv"],
                 "name": s["name"],
-                "ma_lop": ma_lop
+                "ma_lop": class_map.get(s["mssv"]) # Sẽ là None nếu không có lớp
             })
             
         print(f"DEBUG: Tim thay {len(flattened_data)} sinh vien trong Database để gui len Frontend")
         return flattened_data
     except Exception as e:
         print(f"DEBUG ERROR: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return []
 
 if __name__ == "__main__":
     import uvicorn
