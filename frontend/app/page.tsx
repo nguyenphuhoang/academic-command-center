@@ -183,7 +183,7 @@ export default function Home() {
             <h3 className="text-xl font-bold mb-6">Truy cập nhanh</h3>
             <div className="grid grid-cols-1 gap-4">
               <Link href="/subjects" className="flex items-center justify-between p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all font-semibold">
-                Danh sách lớp
+                Danh sách các học phần
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/tasks" className="flex items-center justify-between p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all font-semibold">
