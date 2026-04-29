@@ -782,28 +782,33 @@ def export_semester_report(class_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/students")
-            query = query.eq("class_id", class_id)
-            
-        res = query.execute()
-        data = res.data or []
+def get_all_students():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # Truy vấn từ bảng students và join với class_students để lấy mã lớp
+        res = supabase.table("students").select("mssv, name, class_students(classes(ma_lop))").execute()
         
-        print(f"DEBUG: Database tim thay {len(data)} sinh vien cho truy van nay.")
-        
-        students = []
-        for item in data:
-            s = item.get("students")
-            if not s: continue
+        flattened_data = []
+        for s in res.data:
+            ma_lop = None
+            if s.get("class_students") and len(s["class_students"]) > 0:
+                # Tìm mã lớp hợp lệ đầu tiên
+                for cs in s["class_students"]:
+                    if cs.get("classes"):
+                        ma_lop = cs["classes"].get("ma_lop")
+                        break
             
-            students.append({
+            flattened_data.append({
                 "mssv": s["mssv"],
                 "name": s["name"],
-                "email": s.get("email"),
-                "device_id": s.get("current_device_id"),
-                "class_code": item.get("classes", {}).get("ma_lop") if item.get("classes") else "N/A"
+                "ma_lop": ma_lop
             })
             
-        return students
+        print(f"DEBUG: Tim thay {len(flattened_data)} sinh vien trong Database để gui len Frontend")
+        return flattened_data
     except Exception as e:
+        print(f"DEBUG ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
