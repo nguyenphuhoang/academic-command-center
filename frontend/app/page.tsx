@@ -40,7 +40,7 @@ export default function Home() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
         const res = await fetch(`${apiUrl}/api/dashboard/summary`);
         if (res.ok) {
           const dashboardData = await res.json();

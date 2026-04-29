@@ -409,22 +409,29 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         # 2. Read Student Data
         students_data = []
         for row in range(start_row, sheet.max_row + 1):
-            mssv = sheet.cell(row=row, column=2).value
-            if not mssv: 
-                if row > start_row + 10: break
+            mssv_raw = sheet.cell(row=row, column=2).value
+            if not mssv_raw:
+                continue
+            
+            mssv = str(mssv_raw).strip()
+            # MSSV thường có 8-10 chữ số. Ta kiểm tra ít nhất 5 chữ số để tránh header/footer.
+            if not mssv.isdigit() or len(mssv) < 5:
                 continue
             
             first_name = sheet.cell(row=row, column=3).value or ""
             last_name = sheet.cell(row=row, column=4).value or ""
             name = f"{str(first_name).strip()} {str(last_name).strip()}".strip()
             
+            if not name or len(name) < 2:
+                continue
+            
             # Read REAL Email from Column F (Column 6)
             email = sheet.cell(row=row, column=6).value
             if not email:
-                email = f"{str(mssv).strip()}@student.edu.vn"
+                email = f"{mssv}@student.edu.vn"
             
             students_data.append({
-                "mssv": str(mssv).strip(),
+                "mssv": mssv,
                 "name": name,
                 "email": str(email).strip()
             })

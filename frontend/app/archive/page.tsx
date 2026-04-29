@@ -47,7 +47,7 @@ export default function ArchivePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const [docsRes, subjectsRes] = await Promise.all([
         fetch(`${apiUrl}/api/documents`),
         fetch(`${apiUrl}/api/subjects`)
@@ -95,7 +95,7 @@ export default function ArchivePage() {
       formData.append("name", docName);
       formData.append("subject_id", subjectId);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/documents/upload`, {
         method: "POST",
         body: formData,

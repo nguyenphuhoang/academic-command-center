@@ -13,7 +13,7 @@ function StudentAttendanceContent() {
   const [success, setSuccess] = useState<{message: string, distance: number} | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
 
   // Check if already attended on this device
   useEffect(() => {

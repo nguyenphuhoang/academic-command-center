@@ -38,7 +38,7 @@ export default function TasksPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const [tasksRes, subjectsRes] = await Promise.all([
         fetch(`${apiUrl}/api/tasks`),
         fetch(`${apiUrl}/api/subjects`)
@@ -73,7 +73,7 @@ export default function TasksPage() {
 
     setSubmitting(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/tasks`, {
         method: "POST",
         headers: {
@@ -108,7 +108,7 @@ export default function TasksPage() {
   const toggleTaskStatus = async (task: Task) => {
     const newStatus = task.status === "Hoàn thành" ? "Đang thực hiện" : "Hoàn thành";
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/tasks/${task.id.toString()}?status=${encodeURIComponent(newStatus)}`, {
         method: "PATCH",
       });

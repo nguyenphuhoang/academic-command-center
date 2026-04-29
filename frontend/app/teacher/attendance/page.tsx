@@ -45,7 +45,7 @@ export default function TeacherAttendancePage() {
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
   const [isSessionActive, setIsSessionActive] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
 
   const fetchSessionStatus = useCallback(async (sessionId: string) => {
     setLoadingStatus(true);

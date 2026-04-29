@@ -15,7 +15,7 @@ export default function ConnectionTest() {
     
     // 1. Check Backend API
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/health`);
       if (res.ok) {
         const data = await res.json();
@@ -77,7 +77,7 @@ export default function ConnectionTest() {
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-slate-900">Backend API (FastAPI)</h3>
-              <p className="text-slate-500 text-sm">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}</p>
+              <p className="text-slate-500 text-sm">{process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com"}</p>
             </div>
           </div>
           

@@ -16,7 +16,7 @@ export default function AdminSyncPage() {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com").replace(/\/$/, "");
 
   const fetchAllStudents = async () => {
     setFetching(true);

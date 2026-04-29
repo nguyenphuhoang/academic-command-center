@@ -22,7 +22,7 @@ export default function SubjectsPage() {
     if (!confirm("Bạn có chắc chắn muốn xóa học phần này? Toàn bộ dữ liệu điểm danh liên quan sẽ bị xóa.")) return;
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/classes/${id}`, {
         method: "DELETE",
       });
@@ -40,7 +40,7 @@ export default function SubjectsPage() {
   const fetchSubjects = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/classes`); // Lấy từ bảng classes thực tế
       if (res.ok) {
         const data = await res.json();
@@ -155,7 +155,7 @@ export default function SubjectsPage() {
                 <button 
                   onClick={async (e) => {
                     e.preventDefault();
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
                     try {
                       const res = await fetch(`${apiUrl}/api/attendance/classes/${sub.id}/export-semester`);
                       if (res.ok) {
