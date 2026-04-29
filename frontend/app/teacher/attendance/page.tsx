@@ -63,28 +63,21 @@ export default function TeacherAttendancePage() {
   }, [API_URL]);
 
   useEffect(() => {
-    const fetchClassesFromStudents = async () => {
+    const fetchClassesFromDB = async () => {
       try {
-        // Lấy danh sách các mã lớp thực tế đang có sinh viên
-        const res = await fetch(`${API_URL}/api/admin/students`);
+        // Lấy danh sách lớp từ bảng classes - dùng UUID thật làm id
+        const res = await fetch(`${API_URL}/api/classes`);
         if (res.ok) {
-          const allStudents = await res.json();
-          // Lọc ra các mã lớp duy nhất
-          const codes: string[] = Array.from(new Set<string>(allStudents.map((s: any) => String(s.class_code))));
-          const uniqueClasses = codes.map((code: string) => ({
-            id: code,
-            ma_lop: code,
-            ten_mon: `Lớp HP: ${code}`
-          }));
-          setClasses(uniqueClasses);
+          const data = await res.json();
+          setClasses(data);
         }
       } catch (err) {
-        console.error("Failed to fetch classes from students:", err);
+        console.error("Failed to fetch classes:", err);
       } finally {
         setFetchingClasses(false);
       }
     };
-    fetchClassesFromStudents();
+    fetchClassesFromDB();
   }, [API_URL]);
 
   // Real-time subscription
