@@ -350,16 +350,23 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         wb = openpyxl.load_workbook(buffer, data_only=True)
         sheet = wb.active
 
-        # Read Class Code from B5 (row 5, column 2)
-        class_code = sheet.cell(row=5, column=2).value
+        # Read Class Code from E1 (row 1, column 5)
+        class_code = sheet.cell(row=1, column=5).value
         if not class_code:
-            raise HTTPException(status_code=400, detail="Không tìm thấy mã lớp tại ô B5.")
+            # Fallback to B5 just in case
+            class_code = sheet.cell(row=5, column=2).value
+            
+        if not class_code:
+            raise HTTPException(status_code=400, detail="Không tìm thấy mã lớp tại ô E1 hoặc B5.")
 
-        # Read Student Data starting from row 9
+        # Read Student Data starting from row 7
         students_data = []
-        for row in range(9, sheet.max_row + 1):
+        for row in range(7, sheet.max_row + 1):
             mssv = sheet.cell(row=row, column=2).value
-            if not mssv: break # End of list
+            if not mssv: 
+                # Check if it's just a blank line or end of data
+                if row > 500: break # Safety break
+                continue
             
             first_name = sheet.cell(row=row, column=3).value or ""
             last_name = sheet.cell(row=row, column=4).value or ""
@@ -372,7 +379,7 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             })
 
         if not students_data:
-            raise HTTPException(status_code=400, detail="Không tìm thấy dữ liệu sinh viên từ dòng 9.")
+            raise HTTPException(status_code=400, detail="Không tìm thấy dữ liệu sinh viên từ dòng 7.")
 
         # Upsert into students table
         res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
