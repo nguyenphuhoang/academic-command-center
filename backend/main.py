@@ -734,8 +734,8 @@ def get_all_students():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Get all students ordered by class and name
-        res = supabase.table("students").select("*").order("class_code").order("name").execute()
+        # Lấy tất cả sinh viên, sắp xếp theo tên
+        res = supabase.table("students").select("*").order("name").execute()
         return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
