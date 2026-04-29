@@ -14,3 +14,8 @@
 - Sử dụng bảng màu Slate & Indigo.
 - Font chữ mặc định: Inter.
 - Luôn có màn hình "Loading" khi AI đang xử lý dữ liệu để người dùng không cảm thấy app bị treo.
+
+## 4. QUY TẮC PHÁT TRIỂN & QUẢN LÝ (STABILITY & GOVERNANCE)
+- Luôn tuân thủ nghiêm ngặt tệp `development_rules.md` trong thư mục gốc.
+- Mọi thay đổi Database phải có file migration tương ứng trong `supabase/migrations/`.
+- Luôn cập nhật `project_status.md` sau khi hoàn thành một yêu cầu lớn của người dùng.
