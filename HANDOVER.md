@@ -8,8 +8,8 @@ Dự án là hệ thống quản lý học thuật cho Giảng viên.
 - **Database**: Supabase.
 
 ## 2. TRẠNG THÁI HIỆN TẠI (ĐÃ XỬ LÝ)
-- **Đồng bộ Excel**: Đã xử lý logic cực kỳ chặt chẽ, loại bỏ dòng rác, tự động tạo môn học (Subject) và lớp học (Class).
-- **Điểm danh**: Đã sửa lỗi logic tính toán sinh viên vắng mặt sử dụng bảng `class_students`.
+- **Đồng bộ Excel (Martial Law Sync)**: Đã xử lý logic cực kỳ chặt chẽ, sử dụng `upsert` nguyên tử dựa trên các UNIQUE CONSTRAINT (`ma_lop` cho classes và `class_id, mssv` cho class_students). Đây là cấu trúc "bất khả xâm phạm" để tránh lỗi 42P10 và trùng lặp dữ liệu.
+- **Điểm danh**: Đã sửa lỗi logic tính toán sinh viên vắng mặt sử dụng bảng `class_students`. Hoạt động Real-time qua Supabase.
 - **API Connectivity**: Đã fix lỗi kết nối từ Vercel tới Render bằng cách hardcode fallback URL trong frontend.
 - **Database Structure**: Đã có file migration tại `supabase/migrations/001_initial_schema.sql`.
 
