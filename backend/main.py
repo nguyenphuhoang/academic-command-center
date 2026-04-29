@@ -433,15 +433,22 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         
         # Smart Linking: Đảm bảo Mã lớp từ Excel luôn có mặt trong bảng 'classes'
         class_code_str = str(class_code).strip()
-        class_exists = supabase.table("classes").select("id").ilike("ma_lop", class_code_str).execute()
+        
+        # Tự động trích xuất học kỳ (ví dụ 3 chữ số đầu: 225)
+        semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
+        
+        # Kiểm tra lớp đã tồn tại chưa (khớp cả mã lớp và học kỳ)
+        class_exists = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
+        
         if not class_exists.data:
             supabase.table("classes").insert({
                 "ma_lop": class_code_str,
-                "ten_mon": f"Lớp {class_code_str}"
+                "ten_mon": f"Lớp {class_code_str}",
+                "semester": semester_str
             }).execute()
-            print(f"DEBUG: Tự động tạo lớp mới cho mã: {class_code_str}")
-
-        return {"status": "success", "count": len(students_data), "class_code": class_code_str}
+            print(f"DEBUG: Tự động tạo lớp mới cho mã: {class_code_str} (Học kỳ: {semester_str})")
+        
+        return {"status": "success", "count": len(students_data), "class_code": class_code_str, "semester": semester_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý file Excel: {str(e)}")
 
