@@ -10,7 +10,7 @@ export default function AdminSyncPage() {
   const [result, setResult] = useState<{count: number, class_code: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
   const handleSync = async () => {
     if (!file) {
