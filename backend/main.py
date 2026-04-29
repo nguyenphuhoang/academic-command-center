@@ -457,14 +457,23 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         }, on_conflict="name").execute()
         subject_id = sub_res.data[0]["id"] if sub_res.data else None
         
-        # 3.2: Upsert Class
-        class_res = supabase.table("classes").upsert({
-            "ma_lop": class_code_str, 
-            "subject_id": subject_id, 
-            "ten_mon": final_subject_name, 
-            "semester": semester_str
-        }, on_conflict="ma_lop").execute()
-        class_id = class_res.data[0]["id"]
+        # 3.2: Sync Class (Manual Strategy to avoid 42P10)
+        existing_class = supabase.table("classes").select("id").eq("ma_lop", class_code_str).execute()
+        if existing_class.data:
+            class_id = existing_class.data[0]["id"]
+            supabase.table("classes").update({
+                "subject_id": subject_id, 
+                "ten_mon": final_subject_name, 
+                "semester": semester_str
+            }).eq("id", class_id).execute()
+        else:
+            class_res = supabase.table("classes").insert({
+                "ma_lop": class_code_str, 
+                "subject_id": subject_id, 
+                "ten_mon": final_subject_name, 
+                "semester": semester_str
+            }).execute()
+            class_id = class_res.data[0]["id"]
 
         # 3.2: Bulk Upsert Students (Thông tin cá nhân)
         print(f"DEBUG: Thiet quan luat - Dang nạp {len(processed_students)} sinh vien vào students")
