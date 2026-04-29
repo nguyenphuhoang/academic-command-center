@@ -38,6 +38,8 @@ export default function TeacherAttendancePage() {
   const [session, setSession] = useState<Session | null>(null);
   const [studentsStatus, setStudentsStatus] = useState<{present: any[], absent: any[]}>({present: [], absent: []});
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [success, setSuccess] = useState<{message: string, distance: number} | null>(null);
   const [fetchingClasses, setFetchingClasses] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
@@ -46,6 +48,7 @@ export default function TeacherAttendancePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchSessionStatus = useCallback(async (sessionId: string) => {
+    setLoadingStatus(true);
     try {
       const res = await fetch(`${API_URL}/api/attendance/sessions/${sessionId}/status`);
       if (res.ok) {
@@ -54,6 +57,8 @@ export default function TeacherAttendancePage() {
       }
     } catch (err) {
       console.error("Error fetching session status:", err);
+    } finally {
+      setLoadingStatus(false);
     }
   }, [API_URL]);
 
@@ -156,7 +161,11 @@ export default function TeacherAttendancePage() {
         const data = await res.json();
         // We keep the session in state but marked as inactive
         setSession({ ...session, status: "inactive" });
-        alert(`Đã kết thúc buổi học!\n- Có mặt: ${data.present_count}\n- Vắng: ${data.absent_count}\n- Đã gửi ${data.emails_sent} email nhắc nhở.`);
+        
+        // Auto trigger download
+        handleExportAbsentees();
+        
+        alert(`Đã kết thúc buổi học!\n- Có mặt: ${data.present_count}\n- Vắng: ${data.absent_count}\nBáo cáo đã được tự động tải về.`);
       } else {
         const errData = await res.json();
         setError(errData.detail || "Không thể kết thúc buổi học.");
@@ -426,10 +435,10 @@ export default function TeacherAttendancePage() {
                     disabled={loading}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Mail className="w-5 h-5" /> KẾT THÚC & GỬI MAIL</>}
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><FileDown className="w-5 h-5" /> KẾT THÚC & TẢI BÁO CÁO</>}
                   </button>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">
-                    Hệ thống sẽ tự động lọc sinh viên vắng và gửi cảnh báo.
+                    Hệ thống sẽ tự động lọc sinh viên vắng và tải file báo cáo Excel.
                   </p>
                 </div>
             </div>
@@ -446,12 +455,20 @@ export default function TeacherAttendancePage() {
                 </span>
               </div>
 
-              {studentsStatus.present.length === 0 && studentsStatus.absent.length === 0 ? (
+              {loadingStatus ? (
                 <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] h-96 flex flex-col items-center justify-center p-8 text-center">
                   <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                     <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
                   </div>
                   <p className="text-slate-400 font-bold text-lg">Đang tải danh sách sinh viên...</p>
+                </div>
+              ) : studentsStatus.present.length === 0 && studentsStatus.absent.length === 0 ? (
+                <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] h-96 flex flex-col items-center justify-center p-8 text-center">
+                  <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                    <UserCheck className="w-8 h-8 text-red-300" />
+                  </div>
+                  <p className="text-slate-400 font-bold text-lg">Không có sinh viên nào trong danh sách lớp này.</p>
+                  <p className="text-slate-400 text-sm">Vui lòng kiểm tra lại việc nạp file Excel sinh viên.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">

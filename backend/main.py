@@ -309,8 +309,8 @@ def submit_attendance(submission: AttendanceSubmit):
             "mssv": submission.mssv,
             "student_lat": submission.lat,
             "student_lng": submission.lng,
-            "distance": dist,
-            "device_id": submission.device_id
+            "distance": dist
+            # "device_id": submission.device_id  # Tạm ẩn vì CSDL chưa có cột này
         }).execute()
         
         return {
@@ -335,6 +335,7 @@ def update_attendance_session_status(session_id: str, status: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 import openpyxl
+import openpyxl.styles
 
 @app.post("/api/admin/sync-students")
 async def sync_students_from_excel(file: UploadFile = File(...)):
@@ -551,14 +552,16 @@ def export_absentees(session_id: str):
         output = io.BytesIO()
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "VangMat"
+        ws.title = "DanhSachVang"
         
+        now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+
         if not absent_students:
             ws.append(["Thông báo"])
-            ws.append(["Lớp đi đủ 100%"])
+            ws.append([f"Buổi điểm danh ngày {now_str}: Lớp đi đủ 100%"])
         else:
             # Add Headers
-            headers_list = ["STT", "MSSV", "Họ Tên", "Tên Lớp", "Trạng Thái"]
+            headers_list = ["STT", "MSSV", "Họ Tên", "Mã Lớp HP", "Trạng Thái", "Thời Gian"]
             ws.append(headers_list)
             
             # Add Data
@@ -567,10 +570,15 @@ def export_absentees(session_id: str):
                     i,
                     student.get("mssv", ""),
                     student.get("name", ""),
-                    class_name,
-                    "Vắng"
+                    class_code, # Đây là mã lớp học phần (ví dụ 225NMG03)
+                    "Vắng",
+                    now_str # Thời gian điểm danh
                 ])
         
+        # Format headers
+        for cell in ws[1]:
+            cell.font = openpyxl.styles.Font(bold=True)
+
         wb.save(output)
         output.seek(0)
         
