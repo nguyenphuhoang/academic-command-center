@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, QrCode, Play, Loader2, CheckCircle2, AlertCircle, ChevronLeft, Users, Download, UserCheck } from "lucide-react";
+import { MapPin, QrCode, Play, Loader2, CheckCircle2, AlertCircle, ChevronLeft, Users, Download, UserCheck, Mail, Send, RefreshCw, FileDown } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -36,7 +36,7 @@ export default function TeacherAttendancePage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [session, setSession] = useState<Session | null>(null);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [studentsStatus, setStudentsStatus] = useState<{present: any[], absent: any[]}>({present: [], absent: []});
   const [loading, setLoading] = useState(false);
   const [fetchingClasses, setFetchingClasses] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,23 +45,32 @@ export default function TeacherAttendancePage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // Fetch initial records when session is created
-  const fetchRecords = useCallback(async (sessionId: string) => {
-    if (!supabase) return;
+  const fetchSessionStatus = useCallback(async (sessionId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("timestamp", { ascending: false });
-      
-      if (!error && data) {
-        setRecords(data);
+      const res = await fetch(`${API_URL}/api/attendance/sessions/${sessionId}/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setStudentsStatus(data);
       }
     } catch (err) {
-      console.error("Error fetching records:", err);
+      console.error("Error fetching session status:", err);
     }
-  }, []);
+  }, [API_URL]);
+
+  const handleResetDevice = async (mssv: string) => {
+    if (!confirm(`Bạn có chắc muốn reset khóa thiết bị cho MSSV ${mssv}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/students/${mssv}/reset-device`, { method: "PATCH" });
+      if (res.ok) {
+        alert(`Đã reset thiết bị cho ${mssv} thành công!`);
+      } else {
+        const err = await res.json();
+        alert("Lỗi: " + err.detail);
+      }
+    } catch (e) {
+      alert("Lỗi kết nối máy chủ.");
+    }
+  };
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -84,7 +93,7 @@ export default function TeacherAttendancePage() {
   useEffect(() => {
     if (!session || !supabase) return;
 
-    fetchRecords(session.id);
+    fetchSessionStatus(session.id);
 
     // Subscribe to new attendance records
     const channel = supabase
@@ -97,12 +106,20 @@ export default function TeacherAttendancePage() {
           table: "attendance_records",
           filter: `session_id=eq.${session.id}`,
         },
-        (payload: { new: AttendanceRecord }) => {
+        (payload: any) => {
           const newRecord = payload.new;
-          setRecords((current) => [newRecord, ...current]);
-          
-          // Play a subtle sound if possible (optional)
-          // new Audio('/beep.mp3').play().catch(() => {});
+          setStudentsStatus((prev) => {
+            const studentIdx = prev.absent.findIndex(s => s.mssv === newRecord.mssv);
+            if (studentIdx >= 0) {
+              const student = prev.absent[studentIdx];
+              const updatedStudent = { ...student, status: 'present', distance: newRecord.distance, timestamp: newRecord.created_at || new Date().toISOString() };
+              return {
+                present: [updatedStudent, ...prev.present],
+                absent: prev.absent.filter((_, i) => i !== studentIdx)
+              };
+            }
+            return prev;
+          });
         }
       )
       .subscribe();
@@ -110,7 +127,7 @@ export default function TeacherAttendancePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session, fetchRecords]);
+  }, [session, fetchSessionStatus]);
 
   // Countdown timer logic
   useEffect(() => {
@@ -120,23 +137,35 @@ export default function TeacherAttendancePage() {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && isSessionActive) {
-      handleEndSession();
+      handleFinalizeSession();
     }
     return () => clearInterval(timer);
-  }, [isSessionActive, timeLeft]);
+  }, [isSessionActive, timeLeft]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleEndSession = async () => {
+  const handleFinalizeSession = async () => {
     if (!session) return;
     
+    setLoading(true);
     setIsSessionActive(false);
     try {
-      await fetch(`${API_URL}/api/attendance/session/${session.id}?status=inactive`, {
-        method: "PATCH",
+      const res = await fetch(`${API_URL}/api/attendance/session/${session.id}/finalize`, {
+        method: "POST",
       });
-      // We keep the session in state to show the list, but marked as inactive
-      setSession({ ...session, status: "inactive" });
+      
+      if (res.ok) {
+        const data = await res.json();
+        // We keep the session in state but marked as inactive
+        setSession({ ...session, status: "inactive" });
+        alert(`Đã kết thúc buổi học!\n- Có mặt: ${data.present_count}\n- Vắng: ${data.absent_count}\n- Đã gửi ${data.emails_sent} email nhắc nhở.`);
+      } else {
+        const errData = await res.json();
+        setError(errData.detail || "Không thể kết thúc buổi học.");
+      }
     } catch (err) {
-      console.error("Failed to end session:", err);
+      console.error("Failed to finalize session:", err);
+      setError("Lỗi kết nối máy chủ.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -191,13 +220,46 @@ export default function TeacherAttendancePage() {
     );
   };
 
+  const handleExportAbsentees = async () => {
+    if (!session) return;
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/sessions/${session.id}/export-absentees`);
+      if (!res.ok) {
+        alert("Có lỗi khi xuất file vắng mặt.");
+        return;
+      }
+      
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get('content-disposition');
+      let filename = "Danh_sach_vang.xlsx";
+      if (contentDisposition && contentDisposition.includes('filename=')) {
+        filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Lỗi khi tải báo cáo:", error);
+      alert("Lỗi kết nối khi tải báo cáo.");
+    }
+  };
+
   const handleExportExcel = () => {
-    if (records.length === 0) return;
+    if (studentsStatus.present.length === 0 && studentsStatus.absent.length === 0) return;
     
     const className = classes.find(c => c.id === session?.class_id)?.ten_mon || "Lop-Hoc";
     const csvContent = "data:text/csv;charset=utf-8," 
-      + "STT,MSSV,Thời gian,Khoảng cách (m)\n"
-      + records.map((r, index) => `${records.length - index},${r.mssv},${new Date(r.timestamp).toLocaleString("vi-VN")},${r.distance.toFixed(1)}`).join("\n");
+      + "STT,MSSV,Họ Tên,Trạng thái,Thời gian,Khoảng cách (m)\n"
+      + [
+          ...studentsStatus.present.map((r, index) => `${index + 1},${r.mssv},${r.name},Có mặt,${new Date(r.timestamp).toLocaleString("vi-VN")},${r.distance.toFixed(1)}`),
+          ...studentsStatus.absent.map((r, index) => `${studentsStatus.present.length + index + 1},${r.mssv},${r.name},Vắng,,`)
+        ].join("\n");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -226,13 +288,22 @@ export default function TeacherAttendancePage() {
         </div>
         
         {session && (
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 transition-all active:scale-95"
-          >
-            <Download className="w-4 h-4" />
-            Xuất file Excel
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportAbsentees}
+              className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95"
+            >
+              <FileDown className="w-4 h-4" />
+              Tải danh sách vắng (.xlsx)
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Xuất file tổng
+            </button>
+          </div>
         )}
       </header>
 
@@ -345,16 +416,22 @@ export default function TeacherAttendancePage() {
 
               <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl text-white text-center">
                 <p className="text-indigo-100 font-bold uppercase tracking-widest text-xs mb-2">Số lượng hiện diện</p>
-                <p className="text-7xl font-black">{records.length}</p>
-                <p className="text-indigo-200 text-sm mt-2 font-medium">Sinh viên đã nộp</p>
+                <p className="text-7xl font-black">{studentsStatus.present.length}</p>
+                <p className="text-indigo-200 text-sm mt-2 font-medium">Trên tổng số {studentsStatus.present.length + studentsStatus.absent.length} sinh viên</p>
               </div>
 
-              <button
-                onClick={handleEndSession}
-                className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-4 rounded-2xl font-bold transition-all"
-              >
-                Kết thúc buổi học
-              </button>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleFinalizeSession}
+                    disabled={loading}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Mail className="w-5 h-5" /> KẾT THÚC & GỬI MAIL</>}
+                  </button>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">
+                    Hệ thống sẽ tự động lọc sinh viên vắng và gửi cảnh báo.
+                  </p>
+                </div>
             </div>
 
             {/* Right Column: Live Grid */}
@@ -369,30 +446,52 @@ export default function TeacherAttendancePage() {
                 </span>
               </div>
 
-              {records.length === 0 ? (
+              {studentsStatus.present.length === 0 && studentsStatus.absent.length === 0 ? (
                 <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] h-96 flex flex-col items-center justify-center p-8 text-center">
                   <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                     <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
                   </div>
-                  <p className="text-slate-400 font-bold text-lg">Đang chờ sinh viên đầu tiên...</p>
-                  <p className="text-slate-400 text-sm mt-1">Danh sách sẽ tự động cập nhật khi có người quét mã.</p>
+                  <p className="text-slate-400 font-bold text-lg">Đang tải danh sách sinh viên...</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {records.map((record) => (
+                  {studentsStatus.present.map((student) => (
                     <div
-                      key={record.id}
-                      className="bg-white p-5 rounded-[1.5rem] shadow-md border border-slate-100 flex flex-col items-center text-center animate-in zoom-in-95 fade-in duration-500 hover:shadow-xl hover:scale-[1.05] transition-all group"
+                      key={student.mssv}
+                      className="bg-white p-5 rounded-[1.5rem] shadow-md border-2 border-emerald-500 flex flex-col items-center text-center relative group animate-in zoom-in-95 duration-500"
                     >
-                      <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <UserCheck className="w-6 h-6 text-indigo-600 group-hover:text-white" />
+                      <button onClick={() => handleResetDevice(student.mssv)} className="absolute top-3 right-3 text-slate-300 hover:text-indigo-600 transition-colors z-10" title="Reset Device">
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                      <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-3">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                       </div>
-                      <p className="font-black text-slate-900 text-lg tracking-tight">{record.mssv}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                        {new Date(record.timestamp).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      <p className="font-black text-slate-900 text-lg tracking-tight">{student.mssv}</p>
+                      <p className="text-xs text-slate-500 font-bold mt-1 line-clamp-1" title={student.name}>{student.name}</p>
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase mt-1">
+                        {new Date(student.timestamp).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </p>
-                      <div className="mt-3 px-3 py-1 bg-slate-50 rounded-lg text-[9px] font-black text-slate-400 uppercase">
-                        Distance: {record.distance.toFixed(1)}m
+                      <div className="mt-3 px-3 py-1 bg-emerald-50 rounded-lg text-[9px] font-black text-emerald-600 uppercase">
+                        Distance: {student.distance.toFixed(1)}m
+                      </div>
+                    </div>
+                  ))}
+
+                  {studentsStatus.absent.map((student) => (
+                    <div
+                      key={student.mssv}
+                      className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-200 flex flex-col items-center text-center relative group opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      <button onClick={() => handleResetDevice(student.mssv)} className="absolute top-3 right-3 text-slate-400 hover:text-indigo-600 transition-colors z-10" title="Reset Device">
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                      <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center mb-3">
+                        <UserCheck className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <p className="font-black text-slate-500 text-lg tracking-tight">{student.mssv}</p>
+                      <p className="text-xs text-slate-400 font-bold mt-1 line-clamp-1" title={student.name}>{student.name}</p>
+                      <div className="mt-3 px-3 py-1 bg-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase">
+                        Vắng mặt
                       </div>
                     </div>
                   ))}

@@ -1,11 +1,15 @@
 import os
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Optional
 import math
+import pandas as pd
+from datetime import datetime
+import io
 
 # Try to load .env file (for local development)
 if os.path.exists("../.env"):
@@ -31,13 +35,13 @@ SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL"
 SUPABASE_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("Warning: Supabase credentials not found. Check your environment variables.")
+    pass
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 else:
-    print("Warning: Supabase credentials not found. Check your .env file.")
+    pass
 
 @app.get("/api/health")
 def health_check():
@@ -72,6 +76,7 @@ class AttendanceSubmit(BaseModel):
     mssv: str
     lat: float
     lng: float
+    device_id: str
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     # Earth radius in meters
@@ -205,7 +210,7 @@ async def upload_document(
         return db_response.data[0] if db_response.data else doc_data
         
     except Exception as e:
-        print(f"Upload error: {str(e)}")
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/dashboard/summary")
@@ -230,7 +235,7 @@ def get_dashboard_summary():
             "recent_tasks": recent_tasks.data or []
         }
     except Exception as e:
-        print(f"Dashboard error: {str(e)}")
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/attendance/session")
@@ -262,14 +267,40 @@ def submit_attendance(submission: AttendanceSubmit):
         if session["status"] != "active":
             raise HTTPException(status_code=400, detail="Buổi điểm danh này đã kết thúc.")
 
+        # --- Kiểm tra Chống gian lận (Device Locking) ---
+        student_res = supabase.table("students").select("*").eq("mssv", submission.mssv).execute()
+        if not student_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy thông tin sinh viên.")
+        student = student_res.data[0]
+
+        current_device_id = student.get("current_device_id")
+        
+        if not current_device_id:
+            # Bước B: Lần đầu tiên điểm danh, cập nhật device_id
+            supabase.table("students").update({"current_device_id": submission.device_id}).eq("mssv", submission.mssv).execute()
+        else:
+            # Bước C: So sánh device_id
+            if current_device_id != submission.device_id:
+                raise HTTPException(status_code=400, detail="Thiết bị này không khớp với thiết bị bạn đã đăng ký. Vui lòng liên hệ giảng viên để reset.")
+
+        # Bước D: Kiểm tra 1 máy không được điểm danh cho nhiều người trong cùng session
+        attended_res = supabase.table("attendance_records").select("mssv").eq("session_id", submission.session_id).execute()
+        attended_mssvs = [r["mssv"] for r in attended_res.data if r["mssv"] != submission.mssv]
+        
+        if attended_mssvs:
+            duplicate_device_res = supabase.table("students").select("mssv").eq("current_device_id", submission.device_id).in_("mssv", attended_mssvs).execute()
+            if duplicate_device_res.data:
+                raise HTTPException(status_code=400, detail="Thiết bị này đã được sử dụng để điểm danh cho một sinh viên khác trong buổi học này.")
+        # -----------------------------------------------
+
         # 2. Calculate distance
         dist = calculate_distance(
             session["teacher_lat"], session["teacher_lng"],
             submission.lat, submission.lng
         )
 
-        # 3. Check distance (<= 50m)
-        if dist > 50:
+        # 3. Check distance (<= 100m)
+        if dist > 100:
             raise HTTPException(status_code=400, detail=f"Bạn đang ở quá xa vị trí điểm danh ({dist:.1f}m).")
 
         # 4. Save record
@@ -278,7 +309,8 @@ def submit_attendance(submission: AttendanceSubmit):
             "mssv": submission.mssv,
             "student_lat": submission.lat,
             "student_lng": submission.lng,
-            "distance": dist
+            "distance": dist,
+            "device_id": submission.device_id
         }).execute()
         
         return {
@@ -289,6 +321,238 @@ def submit_attendance(submission: AttendanceSubmit):
         }
     except HTTPException as he:
         raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/attendance/session/{session_id}")
+def update_attendance_session_status(session_id: str, status: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        res = supabase.table("attendance_sessions").update({"status": status}).eq("id", session_id).execute()
+        return res.data[0] if res.data else {"status": "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/sync-students")
+async def sync_students_from_excel():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    
+    file_path = "../danh-sach-sinh-vien/DanhSachSVLHP_225NMG02.xlsx"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy file Excel tại {file_path}")
+
+    try:
+        # Read Class Code from B5
+        header_df = pd.read_excel(file_path, header=None, nrows=6)
+        class_code = header_df.iloc[4, 1] # B5 (index 4, 1)
+
+        # Read Student Data starting from row 9 (index 8)
+        # B: MSSV, C+D: Họ tên
+        df = pd.read_excel(file_path, skiprows=8)
+        
+        # Adjust columns based on the file structure (B is usually the 2nd column)
+        # Using index for safety
+        students_data = []
+        for index, row in df.iterrows():
+            if pd.isna(row.iloc[1]): break # End of list
+            
+            mssv = str(row.iloc[1]).strip()
+            first_name = str(row.iloc[2]).strip()
+            last_name = str(row.iloc[3]).strip()
+            name = f"{first_name} {last_name}"
+            
+            students_data.append({
+                "mssv": mssv,
+                "name": name,
+                "class_code": class_code
+            })
+
+        # Upsert into students table
+        # Note: Upsert in Supabase Python needs a list of dicts
+        res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
+        
+        return {"status": "success", "count": len(students_data), "class_code": class_code}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc file: {str(e)}")
+
+@app.post("/api/attendance/session/{session_id}/finalize")
+async def finalize_attendance(session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    
+    try:
+        # 1. Mark session as inactive
+        session_res = supabase.table("attendance_sessions").update({"status": "inactive"}).eq("id", session_id).execute()
+        if not session_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phiên điểm danh.")
+        
+        session_info = session_res.data[0]
+        class_id = session_info["class_id"]
+        
+        # Get class info
+        class_res = supabase.table("classes").select("*").eq("id", class_id).single().execute()
+        class_name = class_res.data["ten_mon"] if class_res.data else "Lớp học"
+
+        # 2. Get all students for this class_code
+        class_code = class_res.data["ma_lop"]
+        all_students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        all_students = all_students_res.data or []
+
+        # 3. Get all present students for this session
+        present_res = supabase.table("attendance_records").select("mssv").eq("session_id", session_id).execute()
+        present_mssvs = {r["mssv"] for r in present_res.data}
+
+        # 4. Find absent students
+        absent_students = [s for s in all_students if s["mssv"] not in present_mssvs]
+
+        return {
+            "status": "success",
+            "present_count": len(present_mssvs),
+            "absent_count": len(absent_students)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/students/{mssv}/reset-device")
+def reset_student_device(mssv: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        res = supabase.table("students").update({"current_device_id": None}).eq("mssv", mssv).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy sinh viên.")
+        return {"status": "success", "message": "Đã reset thiết bị thành công"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/attendance/sessions/{session_id}/status")
+def get_session_status(session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # Get session info to get class_id
+        session_res = supabase.table("attendance_sessions").select("class_id").eq("id", session_id).single().execute()
+        if not session_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phiên điểm danh")
+            
+        class_id = session_res.data["class_id"]
+        
+        # Get class_code
+        class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).single().execute()
+        if not class_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+            
+        class_code = class_res.data["ma_lop"]
+        
+        # Get all students for this class_code
+        students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        all_students = students_res.data or []
+        
+        # Get present students for this session
+        records_res = supabase.table("attendance_records").select("mssv, distance, created_at").eq("session_id", session_id).execute()
+        present_records = records_res.data or []
+        
+        # Map present mssvs
+        present_map = {r["mssv"]: r for r in present_records}
+        
+        present_students = []
+        absent_students = []
+        
+        for student in all_students:
+            if student["mssv"] in present_map:
+                record = present_map[student["mssv"]]
+                student_info = {
+                    **student, 
+                    "status": "present", 
+                    "distance": record["distance"], 
+                    "timestamp": record["created_at"]
+                }
+                present_students.append(student_info)
+            else:
+                student_info = {
+                    **student, 
+                    "status": "absent"
+                }
+                absent_students.append(student_info)
+                
+        return {
+            "present": present_students,
+            "absent": absent_students
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/attendance/sessions/{session_id}/export-absentees")
+def export_absentees(session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # 1. Get session info to get class_id
+        session_res = supabase.table("attendance_sessions").select("class_id").eq("id", session_id).single().execute()
+        if not session_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phiên điểm danh")
+            
+        class_id = session_res.data["class_id"]
+        
+        # 2. Get class info
+        class_res = supabase.table("classes").select("ma_lop", "ten_mon").eq("id", class_id).single().execute()
+        if not class_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+            
+        class_code = class_res.data["ma_lop"]
+        class_name = class_res.data["ten_mon"]
+        
+        # 3. Get all students for this class_code
+        students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
+        all_students = students_res.data or []
+        
+        # 4. Get present students for this session
+        records_res = supabase.table("attendance_records").select("mssv").eq("session_id", session_id).execute()
+        present_mssvs = {r["mssv"] for r in (records_res.data or [])}
+        
+        # 5. Filter absent students
+        absent_students = [s for s in all_students if s["mssv"] not in present_mssvs]
+        
+        # 6. Create DataFrame
+        if not absent_students:
+            df = pd.DataFrame([{"Thông báo": "Lớp đi đủ 100%"}])
+        else:
+            data = []
+            for i, student in enumerate(absent_students, 1):
+                data.append({
+                    "STT": i,
+                    "MSSV": student.get("mssv", ""),
+                    "Họ Tên": student.get("name", ""),
+                    "Tên Lớp": class_name,
+                    "Trạng Thái": "Vắng"
+                })
+            df = pd.DataFrame(data)
+            
+        # 7. Write to BytesIO
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='VangMat')
+        
+        output.seek(0)
+        
+        # 8. Setup Response
+        today_str = datetime.now().strftime("%d-%m-%Y")
+        filename = f"Vang_mat_{class_code}_{today_str}.xlsx"
+        
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+        
+        return StreamingResponse(
+            output, 
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

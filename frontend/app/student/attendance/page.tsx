@@ -48,6 +48,9 @@ function StudentAttendanceContent() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          const rawId = navigator.userAgent + window.screen.width + window.screen.height;
+          const deviceId = btoa(rawId);
+
           const res = await fetch(`${API_URL}/api/attendance/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -56,6 +59,7 @@ function StudentAttendanceContent() {
               mssv: mssv,
               lat: position.coords.latitude,
               lng: position.coords.longitude,
+              device_id: deviceId,
             }),
           });
 
