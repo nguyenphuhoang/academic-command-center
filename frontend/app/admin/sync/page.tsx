@@ -26,7 +26,8 @@ export default function AdminSyncPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`${API_URL}/api/admin/sync-students`, {
+      const targetUrl = `${API_URL}/api/admin/sync-students`;
+      const res = await fetch(targetUrl, {
         method: "POST",
         body: formData,
       });
@@ -35,11 +36,16 @@ export default function AdminSyncPage() {
         const data = await res.json();
         setResult(data);
       } else {
-        const errData = await res.json();
-        setError(errData.detail || "Đồng bộ thất bại.");
+        const errText = await res.text();
+        let detail = "Đồng bộ thất bại.";
+        try {
+          const errData = JSON.parse(errText);
+          detail = errData.detail || detail;
+        } catch(e) {}
+        setError(`${detail} (URL: ${targetUrl})`);
       }
     } catch (err) {
-      setError("Lỗi kết nối máy chủ.");
+      setError("Lỗi kết nối máy chủ hoặc lỗi CORS.");
     } finally {
       setLoading(false);
     }
