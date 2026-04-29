@@ -669,48 +669,45 @@ def export_semester_report(class_id: str):
         if not all_students:
             raise HTTPException(status_code=400, detail="Lớp học chưa có danh sách sinh viên.")
 
-        # 3. Tìm tất cả các buổi điểm danh mà sinh viên lớp này đã tham gia
-        # Lấy danh sách MSSV của lớp
+        # 3. Lấy TẤT CẢ dữ liệu điểm danh từ trước đến nay (giống như một file Excel tổng)
+        # Bước 1: Lấy danh sách MSSV của lớp này
         mssv_list = [s["mssv"] for s in all_students]
         
-        # Tìm tất cả records của các sinh viên này
-        records_res = supabase.table("attendance_records").select("mssv, session_id, created_at, distance").in_("mssv", mssv_list).execute()
+        # Bước 2: Truy quét toàn bộ bảng attendance_records
+        # Không cần quan tâm buổi học nào, cứ có MSSV trong danh sách lớp là lấy
+        records_res = supabase.table("attendance_records").select("mssv, session_id").in_("mssv", mssv_list).execute()
         all_records = records_res.data or []
         
-        # Lấy danh sách các session_id duy nhất từ records
-        unique_session_ids = list(set([r["session_id"] for r in all_records]))
+        # Tạo bản đồ: MSSV -> Danh sách các buổi đã tham gia (session_id duy nhất)
+        attendance_map = {}
+        unique_sessions = set()
         
-        # Nếu không có records nào, lúc này mới báo lỗi
-        if not all_records:
-             raise HTTPException(status_code=400, detail="Chưa có bất kỳ dữ liệu điểm danh nào được ghi nhận cho sinh viên lớp này.")
-
-        # Tạo map records: mssv -> set of session_ids
-        records_map = {}
         for r in all_records:
-            mssv = r["mssv"]
-            if mssv not in records_map: records_map[mssv] = set()
-            records_map[mssv].add(r["session_id"])
+            m = r["mssv"]
+            sid = r["session_id"]
+            unique_sessions.add(sid)
+            if m not in attendance_map: attendance_map[m] = set()
+            attendance_map[m].add(sid)
 
-        # 5. Create Excel
+        # 4. Tạo file Excel
         output = io.BytesIO()
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "BaoCaoHocKy"
+        ws.title = "BaoCaoTongHop"
         
-        # Header Info
-        ws.append(["BÁO CÁO TỔNG HỢP ĐIỂM DANH HỌC KỲ"])
-        ws.append([f"Môn học: {class_name} ({class_code})"])
-        ws.append([f"Tổng số buổi đã điểm danh: {len(unique_session_ids)}"])
-        ws.append([]) # Empty row
+        # Tiêu đề báo cáo
+        ws.append(["BÁO CÁO ĐIỂM DANH TỔNG HỢP (PHONG CÁCH ĐƠN GIẢN)"])
+        ws.append([f"Lớp: {class_name} ({class_code})"])
+        ws.append([f"Tổng số buổi đã tổ chức điểm danh: {len(unique_sessions)}"])
+        ws.append([])
         
-        # Table Headers
-        headers = ["STT", "MSSV", "Họ Tên", "Số buổi có mặt", "Số buổi vắng (tạm tính)", "Ghi chú"]
-        ws.append(headers)
+        # Header bảng
+        ws.append(["STT", "MSSV", "Họ Tên", "Số buổi có mặt", "Số buổi vắng", "Ghi chú"])
         
-        # Data Rows
+        # Đổ dữ liệu vào
         for i, student in enumerate(all_students, 1):
-            present_count = len(records_map.get(student["mssv"], set()))
-            absent_count = len(unique_session_ids) - present_count
+            present_count = len(attendance_map.get(student["mssv"], set()))
+            absent_count = len(unique_sessions) - present_count
             
             ws.append([
                 i,
@@ -718,7 +715,7 @@ def export_semester_report(class_id: str):
                 student["name"],
                 present_count,
                 absent_count,
-                "Đã tham gia" if present_count > 0 else "Chưa từng tham gia"
+                "Đạt" if absent_count <= 2 else "Vắng nhiều" # Ví dụ cảnh báo
             ])
             
         # Styling
