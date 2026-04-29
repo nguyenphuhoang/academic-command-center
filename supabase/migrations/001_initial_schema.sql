@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS students (
     mssv TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT,
-    current_device_id TEXT,
+    device_id TEXT, -- Khớp với thực tế DB
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS classes (
     ma_lop TEXT UNIQUE NOT NULL,
     ten_mon TEXT,
     semester TEXT,
+    subject_id UUID, -- Thêm cột thiếu
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -31,11 +32,9 @@ CREATE TABLE IF NOT EXISTS subjects (
 
 -- Junction Table: Students in Classes
 CREATE TABLE IF NOT EXISTS class_students (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
     mssv TEXT REFERENCES students(mssv) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(class_id, mssv)
+    PRIMARY KEY (class_id, mssv) -- Sử dụng Composite Primary Key làm Unique Constraint
 );
 
 -- Attendance Sessions
@@ -44,7 +43,7 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
     class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
     teacher_lat DOUBLE PRECISION,
     teacher_lng DOUBLE PRECISION,
-    status TEXT DEFAULT 'active', -- 'active' or 'inactive'
+    status TEXT DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -64,6 +63,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 CREATE TABLE IF NOT EXISTS tasks (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     title TEXT NOT NULL,
+    description TEXT, -- Thêm cột thiếu
     deadline TIMESTAMPTZ,
     status TEXT DEFAULT 'Pending',
     subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
