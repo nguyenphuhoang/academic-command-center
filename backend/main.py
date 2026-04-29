@@ -406,27 +406,33 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         if not class_code:
             class_code = sheet.cell(row=1, column=5).value or "UNKNOWN"
 
-        # 2. Read Student Data
+        # 2. Read Student Data (Robust Loop)
         students_data = []
-        for row in range(start_row, sheet.max_row + 1):
-            mssv_raw = sheet.cell(row=row, column=2).value
-            if not mssv_raw:
+        for row_idx in range(start_row, sheet.max_row + 200): # Scan up to 200 rows beyond max_row to be safe
+            mssv_val = sheet.cell(row=row_idx, column=2).value
+            if not mssv_val:
+                # If we hit 10 empty rows in a row, stop
+                empty_streak = 0
+                for k in range(1, 11):
+                    if sheet.cell(row=row_idx + k, column=2).value:
+                        break
+                    empty_streak += 1
+                if empty_streak >= 10:
+                    break
                 continue
             
-            mssv = str(mssv_raw).strip()
-            # MSSV thường có 8-10 chữ số. Ta kiểm tra ít nhất 5 chữ số để tránh header/footer.
+            mssv = str(mssv_val).strip()
             if not mssv.isdigit() or len(mssv) < 5:
                 continue
-            
-            first_name = sheet.cell(row=row, column=3).value or ""
-            last_name = sheet.cell(row=row, column=4).value or ""
+                
+            first_name = sheet.cell(row=row_idx, column=3).value or ""
+            last_name = sheet.cell(row=row_idx, column=4).value or ""
             name = f"{str(first_name).strip()} {str(last_name).strip()}".strip()
             
             if not name or len(name) < 2:
                 continue
             
-            # Read REAL Email from Column F (Column 6)
-            email = sheet.cell(row=row, column=6).value
+            email = sheet.cell(row=row_idx, column=6).value
             if not email:
                 email = f"{mssv}@student.edu.vn"
             
@@ -437,12 +443,14 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             })
 
         if not students_data:
-            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên hợp lệ.")
+            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên trong file.")
 
-        # 3. Đưa dữ liệu vào bảng sinh viên (Thông tin cá nhân)
-        supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
+        # 3. Insert/Update Students (Batching for stability)
+        for i in range(0, len(students_data), 50):
+            batch = students_data[i:i+50]
+            supabase.table("students").upsert(batch, on_conflict="mssv").execute()
         
-        # 4. Đảm bảo Lớp học tồn tại và lấy ID
+        # 4. Handle Class and Subject
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         
@@ -450,7 +458,6 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         subject_id = None
         if subject_name:
             try:
-                # Derive a subject code from class_code (e.g. 225CHKCHST02 -> CHKCHST)
                 import re
                 subj_code_match = re.search(r'[A-Za-z]+', class_code_str)
                 subj_code = subj_code_match.group(0) if subj_code_match else class_code_str
@@ -464,7 +471,6 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
                 if sub_res.data:
                     subject_id = sub_res.data[0]["id"]
             except Exception as sub_err:
-                # Nếu bảng subjects chưa tồn tại, ta bỏ qua nhưng vẫn tiếp tục đồng bộ lớp
                 print(f"Warning: Could not sync subject '{subject_name}': {str(sub_err)}")
 
         class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
@@ -478,19 +484,16 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             class_id = new_class.data[0]["id"]
         else:
             class_id = class_res.data[0]["id"]
-            # Cập nhật tên môn nếu cần
             if subject_name:
                 supabase.table("classes").update({"ten_mon": subject_name}).eq("id", class_id).execute()
             
-        # 5. KẾT NỐI Sinh viên vào Lớp này (Bảng trung gian class_students)
-        if students_data:
-            links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
-            # Sử dụng từng cụm nhỏ để tránh lỗi timeout nếu danh sách quá dài
-            for i in range(0, len(links), 50):
-                chunk = links[i:i + 50]
-                supabase.table("class_students").upsert(chunk).execute()
+        # 5. Link Students to Class (Batch Upsert)
+        links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
+        for i in range(0, len(links), 50):
+            chunk = links[i:i + 50]
+            supabase.table("class_students").upsert(chunk, on_conflict="class_id, mssv").execute()
         
-        return {"status": "success", "count": len(students_data), "class_code": class_code_str, "semester": semester_str}
+        return {"count": len(students_data), "class_code": class_code_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý file Excel: {str(e)}")
 
