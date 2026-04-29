@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, BookOpen, X, Loader2 } from "lucide-react";
+import { Plus, BookOpen, X, Loader2, ArrowRight, ClipboardList } from "lucide-react";
+import Link from "next/link";
 
 interface Subject {
   id: string | number;
@@ -137,7 +138,7 @@ export default function SubjectsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredSubjects.map((sub) => (
-            <div key={sub.id || Math.random()} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group">
+            <div key={sub.id || Math.random()} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group flex flex-col h-full">
               <div className="flex justify-between items-start mb-6">
                 <div className="p-3 bg-slate-50 rounded-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                   <BookOpen className="w-6 h-6" />
@@ -146,8 +147,48 @@ export default function SubjectsPage() {
                   {sub.semester}
                 </span>
               </div>
-              <h3 className="font-bold text-slate-900 text-lg mb-1 leading-tight">{sub.name}</h3>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{sub.code}</p>
+              
+              <div className="flex-1 mb-6">
+                <h3 className="font-bold text-slate-900 text-lg mb-1 leading-tight">{sub.name}</h3>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{sub.code}</p>
+              </div>
+
+              <div className="pt-6 flex items-center justify-between border-t border-slate-50">
+                <Link 
+                  href={`/teacher/attendance?class_id=${sub.id}`}
+                  className="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-800 transition-colors flex items-center gap-2"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Điểm danh ngay
+                </Link>
+                <div className="h-4 w-[1px] bg-slate-100"></div>
+                <button 
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    try {
+                      const res = await fetch(`${apiUrl}/api/attendance/classes/${sub.id}/export-semester`);
+                      if (res.ok) {
+                        const blob = await res.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `Bao_cao_HK_${sub.code}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                      } else {
+                        alert("Chưa có dữ liệu điểm danh để xuất báo cáo.");
+                      }
+                    } catch (err) {
+                      alert("Lỗi kết nối máy chủ.");
+                    }
+                  }}
+                  className="text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                >
+                  Tải BC học kỳ
+                </button>
+              </div>
             </div>
           ))}
         </div>

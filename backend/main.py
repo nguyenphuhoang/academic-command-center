@@ -627,6 +627,87 @@ def export_absentees(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/attendance/classes/{class_id}/export-semester")
+def export_semester_report(class_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # 1. Get class info
+        class_res = supabase.table("classes").select("ma_lop", "ten_mon").eq("id", class_id).single().execute()
+        if not class_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        class_code = str(class_res.data["ma_lop"]).strip()
+        class_name = class_res.data["ten_mon"]
+
+        # 2. Get all students for this class
+        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
+        all_students = students_res.data or []
+        if not all_students:
+            raise HTTPException(status_code=400, detail="Lớp học chưa có danh sách sinh viên.")
+
+        # 3. Get all sessions for this class
+        sessions_res = supabase.table("attendance_sessions").select("id, created_at").eq("class_id", class_id).execute()
+        all_sessions = sessions_res.data or []
+        session_ids = [s["id"] for s in all_sessions]
+        
+        # 4. Get all attendance records for these sessions
+        records_map = {} # mssv -> set of session_ids
+        if session_ids:
+            records_res = supabase.table("attendance_records").select("mssv, session_id").in_("session_id", session_ids).execute()
+            for r in (records_res.data or []):
+                mssv = r["mssv"]
+                if mssv not in records_map: records_map[mssv] = set()
+                records_map[mssv].add(r["session_id"])
+
+        # 5. Create Excel
+        output = io.BytesIO()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "BaoCaoHocKy"
+        
+        # Header Info
+        ws.append(["BÁO CÁO TỔNG HỢP ĐIỂM DANH HỌC KỲ"])
+        ws.append([f"Môn học: {class_name} ({class_code})"])
+        ws.append([f"Tổng số buổi học: {len(all_sessions)}"])
+        ws.append([]) # Empty row
+        
+        # Table Headers
+        headers = ["STT", "MSSV", "Họ Tên", "Số buổi có mặt", "Số buổi vắng", "Tỷ lệ vắng (%)"]
+        ws.append(headers)
+        
+        # Data Rows
+        for i, student in enumerate(all_students, 1):
+            present_count = len(records_map.get(student["mssv"], set()))
+            absent_count = len(all_sessions) - present_count
+            absent_rate = (absent_count / len(all_sessions) * 100) if len(all_sessions) > 0 else 0
+            
+            ws.append([
+                i,
+                student["mssv"],
+                student["name"],
+                present_count,
+                absent_count,
+                f"{absent_rate:.1f}%"
+            ])
+            
+        # Styling
+        for cell in ws[5]: # Header row
+            cell.font = openpyxl.styles.Font(bold=True)
+            cell.fill = openpyxl.styles.PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+        wb.save(output)
+        output.seek(0)
+        
+        filename = f"Tong_hop_diem_danh_{class_code}.xlsx"
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Access-Control-Expose-Headers': 'Content-Disposition'
+        }
+        return StreamingResponse(output, headers=headers, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/admin/students")
 def get_all_students():
     if not supabase:

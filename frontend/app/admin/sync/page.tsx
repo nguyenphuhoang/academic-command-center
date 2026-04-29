@@ -78,6 +78,17 @@ export default function AdminSyncPage() {
     return acc;
   }, {});
 
+  const [studentSearch, setStudentSearch] = useState("");
+
+  const filteredGroupedStudents = Object.entries(groupedStudents).reduce((acc: any, [code, students]) => {
+    const filtered = students.filter(s => 
+      s.mssv.toLowerCase().includes(studentSearch.toLowerCase()) || 
+      s.name.toLowerCase().includes(studentSearch.toLowerCase())
+    );
+    if (filtered.length > 0) acc[code] = filtered;
+    return acc;
+  }, {});
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 min-h-screen bg-slate-50">
       <header className="flex items-center gap-4 mb-10">
@@ -86,77 +97,81 @@ export default function AdminSyncPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Hệ Thống Quản Trị</h1>
-          <p className="text-slate-500 font-medium">Cập nhật danh sách sinh viên từ file Excel</p>
         </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         {/* Left: Upload */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
-          <div className="flex items-center gap-4 mb-6 text-indigo-600">
-            <div className="p-3 bg-indigo-50 rounded-2xl">
-              <FileSpreadsheet className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-800">Nạp dữ liệu</h2>
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 h-fit">
+          <div className="mb-8">
+            <label className={`flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all ${
+              file ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400 hover:bg-slate-50'
+            }`}>
+              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                <RefreshCcw className={`w-12 h-12 mb-4 ${file ? 'text-indigo-500 animate-spin-slow' : 'text-slate-300'}`} />
+                {file ? (
+                  <p className="text-sm font-bold text-indigo-600 truncate max-w-full">{file.name}</p>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-500 font-bold mb-1">Chọn file Excel sinh viên</p>
+                    <p className="text-xs text-slate-400">(.xlsx hoặc .xls)</p>
+                  </>
+                )}
+              </div>
+              <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </label>
+
+            <button
+              onClick={handleSync}
+              disabled={loading || !file}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white py-5 rounded-3xl font-black shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 mt-8"
+            >
+              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "ĐỒNG BỘ NGAY"}
+            </button>
           </div>
-
-          <label className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all mb-6 ${
-            file ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400'
-          }`}>
-            <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-              <RefreshCcw className={`w-10 h-10 mb-3 ${file ? 'text-indigo-500 animate-spin-slow' : 'text-slate-300'}`} />
-              {file ? (
-                <p className="text-sm font-bold text-indigo-600 truncate max-w-full">{file.name}</p>
-              ) : (
-                <p className="text-sm text-slate-500 font-bold">Bấm để chọn file Excel</p>
-              )}
-            </div>
-            <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          </label>
-
-          <button
-            onClick={handleSync}
-            disabled={loading || !file}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white py-4 rounded-2xl font-black shadow-xl transition-all flex items-center justify-center gap-3"
-          >
-            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "ĐỒNG BỘ NGAY"}
-          </button>
         </div>
 
         {/* Right: History */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 min-h-[400px]">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 min-h-[500px]">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold flex items-center gap-3 text-slate-800">
               <Database className="w-6 h-6 text-slate-400" />
               Kho dữ liệu
             </h2>
-            <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-3 py-1 rounded-full">
-              {allStudents.length} SV
-            </span>
+          </div>
+
+          <div className="mb-6">
+            <input 
+              type="text"
+              placeholder="Tìm MSSV hoặc Tên..."
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:border-indigo-300 transition-all"
+            />
           </div>
 
           {fetching ? (
             <div className="flex flex-col items-center justify-center py-20 opacity-20">
               <Loader2 className="w-10 h-10 animate-spin" />
             </div>
-          ) : Object.keys(groupedStudents).length === 0 ? (
+          ) : Object.keys(filteredGroupedStudents).length === 0 ? (
             <div className="text-center py-20 opacity-20 font-bold text-slate-400">Chưa có dữ liệu</div>
           ) : (
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {Object.entries(groupedStudents).map(([code, students]) => (
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              {Object.entries(filteredGroupedStudents).map(([code, students]: [string, any]) => (
                 <div key={code} className="border border-slate-100 rounded-2xl overflow-hidden text-sm">
                   <div className="bg-slate-50 px-4 py-2 flex justify-between font-bold text-slate-600">
                     <span>{code}</span>
                     <span>{students.length}</span>
                   </div>
                   <div className="p-3 space-y-1">
-                    {students.slice(0, 3).map((s: any) => (
+                    {students.slice(0, 10).map((s: any) => (
                       <div key={s.mssv} className="flex justify-between text-xs opacity-70">
                         <span>{s.mssv}</span>
                         <span className="font-medium">{s.name}</span>
                       </div>
                     ))}
-                    {students.length > 3 && <p className="text-[9px] text-center opacity-30">... và {students.length - 3} em khác</p>}
+                    {students.length > 10 && <p className="text-[9px] text-center opacity-30">... và {students.length - 10} em khác</p>}
                   </div>
                 </div>
               ))}
