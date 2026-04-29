@@ -5,6 +5,7 @@ Bản tóm tắt này giúp AI nắm bắt nhanh bối cảnh dự án khi bắt
 ## 1. Thông tin chung
 - **Công nghệ:** FastAPI (Backend), Next.js (Frontend), Supabase (Database).
 - **Mục tiêu:** Hệ thống điểm danh thời gian thực, chống gian lận và quản lý lớp học.
+- **Trạng thái:** Đã ổn định (Production Ready). Xem [HANDOVER.md](HANDOVER.md) khi chuyển sang phiên chat mới.
 
 ## 2. Các tính năng đã hoàn thiện
 - [x] **Điểm danh Real-time:** Kiểm tra GPS (100m) và Device ID (Chống gian lận).
