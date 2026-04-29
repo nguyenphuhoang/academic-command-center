@@ -385,13 +385,18 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         
         for r in range(1, 16):
             for c in range(1, 10):
-                val = str(sheet.cell(row=r, column=c).value or "").strip()
+                cell_val = str(sheet.cell(row=r, column=c).value or "").strip()
                 # Class Code (7+ chars with digits)
-                if not class_code and len(val) >= 7 and any(char.isdigit() for char in val):
-                    if r < 5: class_code = val
-                # Subject Name
-                if "Tên học phần" in val:
-                    subject_name = str(sheet.cell(row=r, column=c+2).value or "").strip()
+                if not class_code and len(cell_val) >= 7 and any(char.isdigit() for char in cell_val):
+                    if r < 5: class_code = cell_val
+                
+                # Subject Name Detection (More robust)
+                if "Tên học phần" in cell_val:
+                    if ":" in cell_val:
+                        subject_name = cell_val.split(":", 1)[1].strip()
+                    else:
+                        subject_name = str(sheet.cell(row=r, column=c+1).value or sheet.cell(row=r, column=c+2).value or "").strip()
+                    
                     if " - Số TC:" in subject_name:
                         subject_name = subject_name.split(" - Số TC:")[0].strip()
                 # Data Header
@@ -442,13 +447,23 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         # 3. Database Sync (Martial Law Strategy)
         class_code_str = str(class_code).strip()
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
-        final_subject_name = subject_name if subject_name else "Chưa xác định"
+        final_subject_name = subject_name if (subject_name and len(subject_name) > 2) else "Môn học chưa đặt tên"
         
-        # 3.1: Upsert Subject & Class
-        sub_res = supabase.table("subjects").upsert({"name": final_subject_name, "code": class_code_str, "semester": semester_str}, on_conflict="name").execute()
+        # 3.1: Upsert Subject
+        sub_res = supabase.table("subjects").upsert({
+            "name": final_subject_name, 
+            "code": "".join(filter(str.isalpha, class_code_str)),
+            "semester": semester_str
+        }, on_conflict="name").execute()
         subject_id = sub_res.data[0]["id"] if sub_res.data else None
         
-        class_res = supabase.table("classes").upsert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}, on_conflict="ma_lop").execute()
+        # 3.2: Upsert Class
+        class_res = supabase.table("classes").upsert({
+            "ma_lop": class_code_str, 
+            "subject_id": subject_id, 
+            "ten_mon": final_subject_name, 
+            "semester": semester_str
+        }, on_conflict="ma_lop").execute()
         class_id = class_res.data[0]["id"]
 
         # 3.2: Bulk Upsert Students (Thông tin cá nhân)
