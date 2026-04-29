@@ -789,25 +789,30 @@ def get_all_students():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # 1. Lấy tất cả sinh viên (để tìm sinh viên tự do)
-        all_s = supabase.table("students").select("mssv, name").execute()
+        # Lệnh JOIN chuẩn giữa class_students, students và classes
+        res = supabase.table("class_students").select("mssv, students(name), classes(ma_lop)").execute()
         
-        # 2. Lấy tất cả liên kết lớp
-        junctions = supabase.table("class_students").select("mssv, classes(ma_lop)").execute()
-        
-        # 3. Tạo map để tra cứu mã lớp theo mssv
-        class_map = {}
-        for j in junctions.data:
-            if j.get("classes"):
-                class_map[j["mssv"]] = j["classes"].get("ma_lop")
-        
-        # 4. Tổng hợp dữ liệu phẳng
+        # Làm phẳng dữ liệu và xử lý tên "N/A"
         flattened_data = []
-        for s in all_s.data:
+        for item in res.data:
+            student_info = item.get("students") or {}
+            class_info = item.get("classes") or {}
+            
             flattened_data.append({
-                "mssv": s["mssv"],
-                "name": s["name"],
-                "ma_lop": class_map.get(s["mssv"]) # Sẽ là None nếu không có lớp
+                "mssv": item["mssv"],
+                "name": student_info.get("name") or "Chưa có tên",
+                "ma_lop": class_info.get("ma_lop") or "KHÔNG XÁC ĐỊNH"
+            })
+            
+        # Lấy thêm cả sinh viên tự do (những người không nằm trong bảng class_students)
+        all_mssvs_in_classes = [d["mssv"] for d in flattened_data]
+        free_students = supabase.table("students").select("mssv, name").not_.in_("mssv", all_mssvs_in_classes).execute()
+        
+        for fs in (free_students.data or []):
+            flattened_data.append({
+                "mssv": fs["mssv"],
+                "name": fs["name"] or "Chưa có tên",
+                "ma_lop": "SINH VIÊN TỰ DO"
             })
             
         print(f"DEBUG: Tim thay {len(flattened_data)} sinh vien trong Database để gui len Frontend")
