@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { MapPin, User, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { MapPin, User, Loader2, CheckCircle2, AlertCircle, FileText, Download, BookOpen } from "lucide-react";
 
 function StudentAttendanceContent() {
   const searchParams = useSearchParams();
@@ -67,9 +67,13 @@ function StudentAttendanceContent() {
           if (res.ok) {
             const successData = {
               message: data.message,
-              distance: data.distance
+              distance: data.distance,
+              subject_id: data.subject_id
             };
             setSuccess(successData);
+            if (data.subject_id) {
+              fetchSubjectDocs(data.subject_id);
+            }
             // Save to localStorage to prevent re-submitting for another MSSV
             localStorage.setItem(`attended_${sessionId}`, JSON.stringify(successData));
           } else {
@@ -89,19 +93,76 @@ function StudentAttendanceContent() {
     );
   };
 
+  const [docs, setDocs] = useState<any[]>([]);
+
+  const fetchSubjectDocs = async (sid: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/documents?subject_id=${sid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocs(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch docs:", err);
+    }
+  };
+
   if (success) {
     return (
-      <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-slate-100 text-center animate-in zoom-in duration-300">
-        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 mx-auto">
-          <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+      <div className="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 text-center animate-in zoom-in duration-500 max-w-2xl w-full mx-auto">
+        <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-8 mx-auto shadow-inner">
+          <CheckCircle2 className="w-14 h-14 text-emerald-600" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Thành công!</h2>
-        <p className="text-slate-600 mb-6">{success.message}</p>
-        <div className="bg-slate-50 p-4 rounded-2xl inline-block border border-slate-100">
-          <p className="text-xs text-slate-400 uppercase font-black">Khoảng cách</p>
-          <p className="text-2xl font-bold text-indigo-600">{success.distance.toFixed(1)}m</p>
+        <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Điểm Danh Thành Công!</h2>
+        <p className="text-slate-500 font-medium mb-8">Hệ thống đã ghi nhận sự hiện diện của bạn.</p>
+        
+        <div className="flex justify-center gap-4 mb-10">
+          <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm flex-1">
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Khoảng cách</p>
+            <p className="text-3xl font-black text-indigo-600">{success.distance.toFixed(1)}m</p>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 mt-6 italic">Thông tin đã được lưu trên thiết bị này.</p>
+
+        {/* Tài liệu môn học section */}
+        <div className="text-left border-t border-slate-100 pt-10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">Tài liệu học tập</h3>
+          </div>
+
+          <div className="space-y-4">
+            {docs.length > 0 ? (
+              docs.map((doc: any) => (
+                <a 
+                  key={doc.id} 
+                  href={doc.file_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-5 bg-slate-50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 border border-slate-100 rounded-3xl transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors shadow-sm">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-800 text-sm">{doc.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{doc.file_type || "Tài liệu"}</p>
+                    </div>
+                  </div>
+                  <Download className="w-5 h-5 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                </a>
+              ))
+            ) : (
+              <div className="bg-slate-50 p-8 rounded-[2rem] border border-dashed border-slate-200 text-center">
+                <p className="text-sm text-slate-400 font-bold">Chưa có tài liệu nào được tải lên cho môn học này.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="text-[10px] text-slate-400 mt-10 italic font-medium uppercase tracking-widest">Thông tin đã được lưu trên thiết bị này.</p>
       </div>
     );
   }
