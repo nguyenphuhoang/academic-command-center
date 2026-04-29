@@ -448,7 +448,7 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         sub_res = supabase.table("subjects").upsert({"name": final_subject_name, "code": class_code_str, "semester": semester_str}, on_conflict="name").execute()
         subject_id = sub_res.data[0]["id"] if sub_res.data else None
         
-        class_res = supabase.table("classes").upsert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}, on_conflict="ma_lop, semester").execute()
+        class_res = supabase.table("classes").upsert({"ma_lop": class_code_str, "subject_id": subject_id, "ten_mon": final_subject_name, "semester": semester_str}, on_conflict="ma_lop").execute()
         class_id = class_res.data[0]["id"]
 
         # 3.2: Bulk Upsert Students (Thông tin cá nhân)
