@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, BookOpen, X, Loader2, ArrowRight, ClipboardList } from "lucide-react";
+import { Plus, BookOpen, X, Loader2, ArrowRight, ClipboardList, Trash2 } from "lucide-react";
+
 import Link from "next/link";
 
 interface Subject {
@@ -24,6 +25,25 @@ export default function SubjectsPage() {
   const [code, setCode] = useState("");
   const [semester, setSemester] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const handleDelete = async (id: string | number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa học phần này? Toàn bộ dữ liệu điểm danh liên quan sẽ bị xóa.")) return;
+    
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/classes/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        fetchSubjects();
+      } else {
+        alert("Không thể xóa lớp này. Có thể có dữ liệu ràng buộc.");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối máy chủ.");
+    }
+  };
 
   const fetchSubjects = async () => {
     setLoading(true);
@@ -143,9 +163,20 @@ export default function SubjectsPage() {
                 <div className="p-3 bg-slate-50 rounded-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                   <BookOpen className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-tight rounded-lg">
-                  {sub.semester}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-tight rounded-lg">
+                    {sub.semester}
+                  </span>
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete(sub.id);
+                    }}
+                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               
               <div className="flex-1 mb-6">

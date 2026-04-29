@@ -99,6 +99,16 @@ def get_classes():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/classes/{class_id}")
+def delete_class(class_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        res = supabase.table("classes").delete().eq("id", class_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/subjects")
 def get_subjects():
     if not supabase:
