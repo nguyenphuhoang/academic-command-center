@@ -427,7 +427,7 @@ async def finalize_attendance(session_id: str):
         class_name = class_res.data["ten_mon"] if class_res.data else "Lớp học"
 
         # 2. Get all students for this class_code
-        class_code = class_res.data["ma_lop"]
+        class_code = str(class_res.data["ma_lop"]).strip()
         all_students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
         all_students = all_students_res.data or []
 
@@ -476,9 +476,10 @@ def get_session_status(session_id: str):
         if not class_res.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
             
-        class_code = class_res.data["ma_lop"]
+        class_code = str(class_res.data["ma_lop"]).strip()
         
         # Get all students for this class_code
+        # We use .ilike to be case-insensitive and more flexible if needed
         students_res = supabase.table("students").select("*").eq("class_code", class_code).execute()
         all_students = students_res.data or []
         
@@ -534,7 +535,7 @@ def export_absentees(session_id: str):
         if not class_res.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
             
-        class_code = class_res.data["ma_lop"]
+        class_code = str(class_res.data["ma_lop"]).strip()
         class_name = class_res.data["ten_mon"]
         
         # 3. Get all students for this class_code
