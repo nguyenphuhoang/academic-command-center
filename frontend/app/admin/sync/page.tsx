@@ -108,7 +108,7 @@ export default function AdminSyncPage() {
           <ChevronLeft className="w-6 h-6" />
         </Link>
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Hệ Thống Quản Trị</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Hệ Thống Quản Trị v2.0</h1>
         </div>
       </header>
 
