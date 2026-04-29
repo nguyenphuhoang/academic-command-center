@@ -503,6 +503,74 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Martial Law Sync Error: {str(e)}")
 
+@app.post("/api/admin/sync-students-json")
+async def sync_students_from_json(file: UploadFile = File(...)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not initialized.")
+
+    try:
+        import json
+        contents = await file.read()
+        data = json.loads(contents)
+        
+        class_code_str = data.get("class_id", "UNKNOWN").strip()
+        subject_name = data.get("subject_name", "Môn học chưa đặt tên").strip()
+        students_list = data.get("students", [])
+        
+        if not students_list:
+            return {"status": "error", "message": "File JSON không có dữ liệu sinh viên."}
+
+        # 1. Sync Subject
+        semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
+        sub_res = supabase.table("subjects").upsert({
+            "name": subject_name, 
+            "code": "".join(filter(str.isalpha, class_code_str)),
+            "semester": semester_str
+        }, on_conflict="name").execute()
+        subject_id = sub_res.data[0]["id"] if sub_res.data else None
+
+        # 2. Sync Class
+        existing_class = supabase.table("classes").select("id").eq("ma_lop", class_code_str).execute()
+        if existing_class.data:
+            class_id = existing_class.data[0]["id"]
+            supabase.table("classes").update({
+                "subject_id": subject_id, 
+                "ten_mon": subject_name, 
+                "semester": semester_str
+            }).eq("id", class_id).execute()
+        else:
+            class_res = supabase.table("classes").insert({
+                "ma_lop": class_code_str, 
+                "subject_id": subject_id, 
+                "ten_mon": subject_name, 
+                "semester": semester_str
+            }).execute()
+            class_id = class_res.data[0]["id"]
+
+        # 3. Bulk Sync Students
+        processed_students = []
+        for s in students_list:
+            processed_students.append({
+                "mssv": str(s["mssv"]).strip(),
+                "name": s["full_name"].strip(),
+                "email": s.get("email", f"{s['mssv']}@student.edu.vn").strip()
+            })
+            
+        supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
+
+        # 4. Clean Slate Junction
+        supabase.table("class_students").delete().eq("class_id", class_id).execute()
+        junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
+        supabase.table("class_students").upsert(junction_data, on_conflict="class_id,mssv").execute()
+
+        return {
+            "status": "success",
+            "successfully_synced": len(processed_students),
+            "class_code": class_code_str
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JSON Sync Error: {str(e)}")
+
 @app.post("/api/attendance/session/{session_id}/finalize")
 async def finalize_attendance(session_id: str):
     if not supabase:

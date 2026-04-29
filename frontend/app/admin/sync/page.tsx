@@ -58,8 +58,10 @@ export default function AdminSyncPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      const isJson = file.name.endsWith('.json');
+      const endpoint = isJson ? '/api/admin/sync-students-json' : '/api/admin/sync-students';
 
-      const res = await fetch(`${API_URL}/api/admin/sync-students`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
       });
@@ -125,22 +127,27 @@ export default function AdminSyncPage() {
                   <p className="text-sm font-bold text-indigo-600 truncate max-w-full">{file.name}</p>
                 ) : (
                   <>
-                    <p className="text-sm text-slate-500 font-bold mb-1">Chọn file Excel sinh viên</p>
-                    <p className="text-xs text-slate-400">(.xlsx hoặc .xls)</p>
+                    <p className="text-sm text-slate-500 font-bold mb-1">Chọn file Excel hoặc JSON sinh viên</p>
+                    <p className="text-xs text-slate-400">(.xlsx, .xls hoặc .json)</p>
                   </>
                 )}
               </div>
-              <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <input 
+                type="file" 
+                className="hidden" 
+                accept=".xlsx,.xls,.json"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
             </label>
-
-            <button
-              onClick={handleSync}
-              disabled={loading || !file}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white py-5 rounded-3xl font-black shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 mt-8"
-            >
-              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "ĐỒNG BỘ NGAY"}
-            </button>
           </div>
+
+          <button
+            onClick={handleSync}
+            disabled={!file || loading}
+            className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white font-black text-xl rounded-[2rem] shadow-xl shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-3"
+          >
+            {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : "ĐỒNG BỘ NGAY"}
+          </button>
         </div>
 
         {/* Right: History */}
