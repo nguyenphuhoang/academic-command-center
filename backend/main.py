@@ -415,38 +415,39 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
             # Read REAL Email from Column F (Column 6)
             email = sheet.cell(row=row, column=6).value
             if not email:
-                # Fallback if email is missing in some rows
                 email = f"{str(mssv).strip()}@student.edu.vn"
             
             students_data.append({
                 "mssv": str(mssv).strip(),
                 "name": name,
-                "email": str(email).strip(),
-                "class_code": str(class_code).strip() # Sử dụng mã lớp chung từ tiêu đề
+                "email": str(email).strip()
             })
 
         if not students_data:
-            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên hợp lệ (Bắt đầu quét từ dòng {start_row}).")
+            raise HTTPException(status_code=400, detail=f"Không tìm thấy dữ liệu sinh viên hợp lệ.")
 
-        # Upsert into students table
-        res = supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
+        # 3. Đưa dữ liệu vào bảng sinh viên (Thông tin cá nhân)
+        supabase.table("students").upsert(students_data, on_conflict="mssv").execute()
         
-        # Smart Linking: Đảm bảo Mã lớp từ Excel luôn có mặt trong bảng 'classes'
+        # 4. Đảm bảo Lớp học tồn tại và lấy ID
         class_code_str = str(class_code).strip()
-        
-        # Tự động trích xuất học kỳ (ví dụ 3 chữ số đầu: 225)
         semester_str = class_code_str[:3] if class_code_str[:3].isdigit() else "HK"
         
-        # Kiểm tra lớp đã tồn tại chưa (khớp cả mã lớp và học kỳ)
-        class_exists = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
+        class_res = supabase.table("classes").select("id").match({"ma_lop": class_code_str, "semester": semester_str}).execute()
         
-        if not class_exists.data:
-            supabase.table("classes").insert({
+        if not class_res.data:
+            new_class = supabase.table("classes").insert({
                 "ma_lop": class_code_str,
                 "ten_mon": f"Lớp {class_code_str}",
                 "semester": semester_str
             }).execute()
-            print(f"DEBUG: Tự động tạo lớp mới cho mã: {class_code_str} (Học kỳ: {semester_str})")
+            class_id = new_class.data[0]["id"]
+        else:
+            class_id = class_res.data[0]["id"]
+            
+        # 5. KẾT NỐI Sinh viên vào Lớp này (Bảng trung gian class_students)
+        links = [{"class_id": class_id, "mssv": s["mssv"]} for s in students_data]
+        supabase.table("class_students").upsert(links, on_conflict="class_id,mssv").execute()
         
         return {"status": "success", "count": len(students_data), "class_code": class_code_str, "semester": semester_str}
     except Exception as e:
@@ -503,67 +504,51 @@ def reset_student_device(mssv: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/attendance/sessions/{session_id}/status")
-def get_session_status(session_id: str):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+@app.get("/api/attendance/session/{session_id}")
+async def get_session_status(session_id: str):
     try:
-        # Get session info to get class_id
-        session_res = supabase.table("attendance_sessions").select("class_id").eq("id", session_id).single().execute()
+        # 1. Lấy thông tin phiên
+        session_res = supabase.table("attendance_sessions").select("*, classes(*)").eq("id", session_id).single().execute()
         if not session_res.data:
-            raise HTTPException(status_code=404, detail="Không tìm thấy phiên điểm danh")
+            raise HTTPException(status_code=404, detail="Không tìm thấy phiên.")
             
-        class_id = session_res.data["class_id"]
+        session_info = session_res.data
+        class_id = session_info["class_id"]
         
-        # 1. Tìm mã lớp (class_code) từ session này
-        class_res = supabase.table("classes").select("ma_lop").eq("id", class_id).execute()
-        
-        search_code = str(class_id).strip()
-        if class_res.data and len(class_res.data) > 0:
-            search_code = str(class_res.data[0]["ma_lop"]).strip()
-
-        # 2. Lấy sinh viên - Dùng Wildcard % để tìm kiếm gần đúng (vd: %225NMG03%)
-        # Điều này giúp bỏ qua các khoảng trắng thừa hoặc ký tự rác
-        students_res = supabase.table("students").select("*").ilike("class_code", f"%{search_code}%").execute()
+        # 2. Lấy TOÀN BỘ danh sách sinh viên của lớp này
+        students_res = supabase.table("class_students").select("mssv, students(name)").eq("class_id", class_id).execute()
         all_students = students_res.data or []
         
-        # Nếu vẫn không thấy ai (do mã lớp trong bảng students quá khác), 
-        # thử lấy mã ngắn hơn (ví dụ bỏ phần đuôi)
-        if not all_students and len(search_code) > 4:
-            short_code = search_code[:6] # Lấy 6 ký tự đầu (vd: 225NMG)
-            students_res = supabase.table("students").select("*").ilike("class_code", f"%{short_code}%").execute()
-            all_students = students_res.data or []
-
-        # 3. Lấy danh sách đã điểm danh
-        records_res = supabase.table("attendance_records").select("mssv, distance, created_at").eq("session_id", session_id).execute()
-        present_records = records_res.data or []
+        # 3. Lấy những người ĐÃ điểm danh trong phiên này
+        records_res = supabase.table("attendance_records").select("mssv, distance").eq("session_id", session_id).execute()
+        present_records = {r["mssv"]: r for r in (records_res.data or [])}
         
-        # Map present mssvs
-        present_map = {r["mssv"]: r for r in present_records}
+        # 4. Phân loại
+        present_list = []
+        absent_list = []
         
-        present_students = []
-        absent_students = []
-        
-        for student in all_students:
-            if student["mssv"] in present_map:
-                record = present_map[student["mssv"]]
-                student_info = {
-                    **student, 
-                    "status": "present", 
-                    "distance": record["distance"], 
-                    "timestamp": record["created_at"]
-                }
-                present_students.append(student_info)
+        for item in all_students:
+            mssv = item["mssv"]
+            name = item["students"]["name"] if item.get("students") else "N/A"
+            
+            if mssv in present_records:
+                present_list.append({
+                    "mssv": mssv,
+                    "name": name,
+                    "status": "present",
+                    "distance": present_records[mssv].get("distance")
+                })
             else:
-                student_info = {
-                    **student, 
+                absent_list.append({
+                    "mssv": mssv,
+                    "name": name,
                     "status": "absent"
-                }
-                absent_students.append(student_info)
+                })
                 
         return {
-            "present": present_students,
-            "absent": absent_students
+            "session": session_info,
+            "present": present_list,
+            "absent": absent_list
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -660,14 +645,18 @@ def export_semester_report(class_id: str):
         class_res = supabase.table("classes").select("ma_lop", "ten_mon").eq("id", class_id).single().execute()
         if not class_res.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
-        class_code = str(class_res.data["ma_lop"]).strip()
-        class_name = class_res.data["ten_mon"]
-
-        # 2. Get all students for this class
-        students_res = supabase.table("students").select("*").ilike("class_code", class_code).execute()
-        all_students = students_res.data or []
+        # 2. Lấy danh sách sinh viên THỰC TẾ của lớp này (Từ bảng kết nối class_students)
+        # Truy vấn join: class_students -> students
+        students_res = supabase.table("class_students").select("mssv, students(name)").eq("class_id", class_id).execute()
+        all_students = []
+        for item in (students_res.data or []):
+            all_students.append({
+                "mssv": item["mssv"],
+                "name": item["students"]["name"] if item.get("students") else "N/A"
+            })
+            
         if not all_students:
-            raise HTTPException(status_code=400, detail="Lớp học chưa có danh sách sinh viên.")
+            raise HTTPException(status_code=400, detail="Lớp học này chưa có danh sách sinh viên. Vui lòng đồng bộ Excel trước.")
 
         # 3. Lấy TẤT CẢ dữ liệu điểm danh từ trước đến nay (giống như một file Excel tổng)
         # Bước 1: Lấy danh sách MSSV của lớp này
