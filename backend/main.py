@@ -669,26 +669,27 @@ def export_semester_report(class_id: str):
         if not all_students:
             raise HTTPException(status_code=400, detail="Lớp học chưa có danh sách sinh viên.")
 
-        # 3. Get all sessions for this class (Tìm theo Mã học phần: 225NMG02, 225NMG03...)
-        # Lấy mã gốc (ví dụ: 225NMG) để tìm kiếm rộng hơn nếu cần
-        base_code = class_code[:7] if len(class_code) >= 7 else class_code
+        # 3. Tìm tất cả các buổi điểm danh mà sinh viên lớp này đã tham gia
+        # Lấy danh sách MSSV của lớp
+        mssv_list = [s["mssv"] for s in all_students]
         
-        sessions_res = supabase.table("attendance_sessions").select("id, created_at").or_(f"class_id.eq.{class_id},class_id.eq.{class_code},class_id.ilike.%{base_code}%").execute()
-        all_sessions = sessions_res.data or []
+        # Tìm tất cả records của các sinh viên này
+        records_res = supabase.table("attendance_records").select("mssv, session_id, created_at, distance").in_("mssv", mssv_list).execute()
+        all_records = records_res.data or []
         
-        if not all_sessions:
-            raise HTTPException(status_code=400, detail="Chưa có dữ liệu điểm danh nào cho học phần này.")
-            
-        session_ids = [s["id"] for s in all_sessions]
+        # Lấy danh sách các session_id duy nhất từ records
+        unique_session_ids = list(set([r["session_id"] for r in all_records]))
         
-        # 4. Get all attendance records for these sessions
-        records_map = {} # mssv -> set of session_ids
-        if session_ids:
-            records_res = supabase.table("attendance_records").select("mssv, session_id").in_("session_id", session_ids).execute()
-            for r in (records_res.data or []):
-                mssv = r["mssv"]
-                if mssv not in records_map: records_map[mssv] = set()
-                records_map[mssv].add(r["session_id"])
+        # Nếu không có records nào, lúc này mới báo lỗi
+        if not all_records:
+             raise HTTPException(status_code=400, detail="Chưa có bất kỳ dữ liệu điểm danh nào được ghi nhận cho sinh viên lớp này.")
+
+        # Tạo map records: mssv -> set of session_ids
+        records_map = {}
+        for r in all_records:
+            mssv = r["mssv"]
+            if mssv not in records_map: records_map[mssv] = set()
+            records_map[mssv].add(r["session_id"])
 
         # 5. Create Excel
         output = io.BytesIO()
@@ -699,18 +700,17 @@ def export_semester_report(class_id: str):
         # Header Info
         ws.append(["BÁO CÁO TỔNG HỢP ĐIỂM DANH HỌC KỲ"])
         ws.append([f"Môn học: {class_name} ({class_code})"])
-        ws.append([f"Tổng số buổi học: {len(all_sessions)}"])
+        ws.append([f"Tổng số buổi đã điểm danh: {len(unique_session_ids)}"])
         ws.append([]) # Empty row
         
         # Table Headers
-        headers = ["STT", "MSSV", "Họ Tên", "Số buổi có mặt", "Số buổi vắng", "Tỷ lệ vắng (%)"]
+        headers = ["STT", "MSSV", "Họ Tên", "Số buổi có mặt", "Số buổi vắng (tạm tính)", "Ghi chú"]
         ws.append(headers)
         
         # Data Rows
         for i, student in enumerate(all_students, 1):
             present_count = len(records_map.get(student["mssv"], set()))
-            absent_count = len(all_sessions) - present_count
-            absent_rate = (absent_count / len(all_sessions) * 100) if len(all_sessions) > 0 else 0
+            absent_count = len(unique_session_ids) - present_count
             
             ws.append([
                 i,
@@ -718,7 +718,7 @@ def export_semester_report(class_id: str):
                 student["name"],
                 present_count,
                 absent_count,
-                f"{absent_rate:.1f}%"
+                "Đã tham gia" if present_count > 0 else "Chưa từng tham gia"
             ])
             
         # Styling
