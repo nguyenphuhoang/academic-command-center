@@ -662,9 +662,11 @@ def export_semester_report(class_id: str):
         if not all_students:
             raise HTTPException(status_code=400, detail="Lớp học chưa có danh sách sinh viên.")
 
-        # 3. Get all sessions for this class (Tìm kiếm cực rộng để lấy hết dữ liệu thử nghiệm)
-        # Tìm theo: UUID lớp, Mã lớp, hoặc Tên môn học
-        sessions_res = supabase.table("attendance_sessions").select("id, created_at").or_(f"class_id.eq.{class_id},class_id.eq.{class_code},class_id.ilike.%{class_name}%").execute()
+        # 3. Get all sessions for this class (Tìm theo Mã học phần: 225NMG02, 225NMG03...)
+        # Lấy mã gốc (ví dụ: 225NMG) để tìm kiếm rộng hơn nếu cần
+        base_code = class_code[:7] if len(class_code) >= 7 else class_code
+        
+        sessions_res = supabase.table("attendance_sessions").select("id, created_at").or_(f"class_id.eq.{class_id},class_id.eq.{class_code},class_id.ilike.%{base_code}%").execute()
         all_sessions = sessions_res.data or []
         
         if not all_sessions:
