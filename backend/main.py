@@ -400,7 +400,7 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
                     if " - Số TC:" in subject_name:
                         subject_name = subject_name.split(" - Số TC:")[0].strip()
                 # Data Header
-                if "Mã SV" in val or "MSSV" in val:
+                if "Mã SV" in cell_val or "MSSV" in cell_val:
                     start_row = r + 1
 
         if not class_code:
