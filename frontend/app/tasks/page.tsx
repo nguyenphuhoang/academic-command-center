@@ -110,7 +110,7 @@ export default function TasksPage() {
     const newStatus = task.status === "Hoàn thành" ? "Đang thực hiện" : "Hoàn thành";
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
-      const res = await fetch(`${apiUrl}/api/tasks/${task.id.toString()}?status=${encodeURIComponent(newStatus)}`, {
+      const res = await fetch(`${apiUrl}/api/tasks/${task.id}?status=${encodeURIComponent(newStatus)}`, {
         method: "PATCH",
       });
       if (res.ok) {

@@ -45,7 +45,7 @@ export default function ArchivePage() {
   // Upload form states
   const [file, setFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  const [subjectId, setSubjectId] = useState<string | number>("");
   const [newSubjectName, setNewSubjectName] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -58,7 +58,7 @@ export default function ArchivePage() {
       const res = await fetch(`${API_URL}/api/subjects?v=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        setSubjects(data);
+        setSubjects(Array.isArray(data) ? data : []);
       } else {
         setFetchError("Không thể tải danh sách môn học.");
       }
@@ -158,7 +158,7 @@ export default function ArchivePage() {
     doc.subjects?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: any) => {
     if (!confirm("Bạn có chắc chắn muốn xóa tài liệu này không?")) return;
     
     try {
