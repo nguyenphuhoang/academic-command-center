@@ -1,3 +1,4 @@
+# VERSION: 2.0.1 - EMERGENCY DEPLOY TRIGGER
 import os
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.responses import StreamingResponse
