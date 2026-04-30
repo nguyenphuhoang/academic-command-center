@@ -335,17 +335,25 @@ export default function ArchivePage() {
                 >
                   Hủy bỏ
                 </button>
-                <button 
-                  type="submit"
-                  disabled={uploading}
-                  className="flex-1 px-6 py-3.5 text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold transition-all disabled:opacity-70 flex justify-center items-center gap-2 shadow-lg shadow-indigo-200"
-                >
-                  {uploading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Đang tải lên...</>
-                  ) : (
-                    <><Upload className="w-5 h-5" /> Tải lên ngay</>
+                <div className="flex-1">
+                  <button 
+                    type="submit"
+                    disabled={uploading}
+                    className="w-full px-6 py-3.5 text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold transition-all disabled:opacity-70 flex justify-center items-center gap-2 shadow-lg shadow-indigo-200"
+                  >
+                    {uploading ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Đang tải lên...</>
+                    ) : (
+                      <><Upload className="w-5 h-5" /> Tải lên ngay</>
+                    )}
+                  </button>
+                  {uploading && file && file.size > 5 * 1024 * 1024 && (
+                    <p className="text-center text-indigo-500 text-[10px] font-bold animate-pulse mt-2">
+                      🚀 Đang xử lý file lớn ({(file.size / 1024 / 1024).toFixed(2)} MB)... <br/> 
+                      Vui lòng không đóng cửa sổ này.
+                    </p>
                   )}
-                </button>
+                </div>
               </div>
             </form>
           </div>
