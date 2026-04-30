@@ -550,12 +550,21 @@ async def sync_students_from_json(file: UploadFile = File(...)):
         # 3. Bulk Sync Students
         processed_students = []
         for s in students_list:
+            mssv = str(s.get("mssv", "")).strip()
+            name = str(s.get("full_name", "")).strip()
+            if not mssv or not name:
+                continue
+                
             processed_students.append({
-                "mssv": str(s["mssv"]).strip(),
-                "name": s["full_name"].strip(),
-                "email": s.get("email", f"{s['mssv']}@student.edu.vn").strip()
+                "mssv": mssv,
+                "name": name,
+                "email": str(s.get("email", f"{mssv}@student.edu.vn")).strip()
             })
             
+        if not processed_students:
+            return {"status": "error", "message": "Không tìm thấy sinh viên hợp lệ trong file JSON."}
+
+        print(f"DEBUG: Nạp {len(processed_students)} sinh vien tu JSON vao Database")
         supabase.table("students").upsert(processed_students, on_conflict="mssv").execute()
 
         # 4. Clean Slate Junction
