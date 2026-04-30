@@ -116,8 +116,18 @@ def get_subjects():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
+        # Lấy danh sách học phần duy nhất để tránh trùng lặp
         response = supabase.table("subjects").select("*").order("name").execute()
-        return response.data
+        
+        # Lọc thủ công để chắc chắn mỗi tên chỉ hiện một lần trong Dropdown
+        unique_subjects = []
+        seen_names = set()
+        for s in response.data:
+            if s["name"] not in seen_names:
+                unique_subjects.append(s)
+                seen_names.add(s["name"])
+                
+        return unique_subjects
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

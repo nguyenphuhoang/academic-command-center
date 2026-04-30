@@ -49,13 +49,14 @@ export default function ArchivePage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const [docsRes, subjectsRes] = await Promise.all([
-        fetch(`${apiUrl}/api/documents`),
-        fetch(`${apiUrl}/api/subjects`)
+        fetch(`${apiUrl}/api/documents?v=${Date.now()}`),
+        fetch(`${apiUrl}/api/subjects?v=${Date.now()}`)
       ]);
       
       if (docsRes.ok && subjectsRes.ok) {
         const docsData = await docsRes.json();
         const subjectsData = await subjectsRes.json();
+        console.log("DEBUG: Loaded subjects:", subjectsData);
         setDocuments(docsData);
         setSubjects(subjectsData);
       }
@@ -173,7 +174,10 @@ export default function ArchivePage() {
             {searchTerm ? "Không có tài liệu nào khớp với tìm kiếm của bạn." : "Bạn chưa tải lên tài liệu nào. Hãy bắt đầu ngay!"}
           </p>
           <button 
-            onClick={() => setIsUploadOpen(true)}
+            onClick={() => {
+              fetchData();
+              setIsUploadOpen(true);
+            }}
             className="text-indigo-600 font-bold hover:text-indigo-700 transition-colors"
           >
             + Tải lên tài liệu đầu tiên
