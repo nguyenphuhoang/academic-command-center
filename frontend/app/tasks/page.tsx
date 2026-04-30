@@ -6,6 +6,7 @@ import { Plus, CheckSquare, Square, X, Loader2, Calendar, BookOpen } from "lucid
 interface Subject {
   id: string | number;
   name: string;
+  code?: string;
 }
 
 interface Task {
