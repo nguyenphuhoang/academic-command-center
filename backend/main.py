@@ -515,17 +515,6 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         check_res = supabase.table("class_students").select("mssv").eq("class_id", class_id).execute()
         actual_count = len(check_res.data) if check_res.data else 0
         
-        # --- BƯỚC TỔNG VỆ SINH: Xóa sinh viên mồ côi (không thuộc bất kỳ lớp nào) ---
-        print("DEBUG: Dang quet don sinh vien mo coi...")
-        # Lấy danh sách tất cả MSSV đang có lớp
-        active_junctions = supabase.table("class_students").select("mssv").execute()
-        active_mssvs = list(set([j["mssv"] for j in active_junctions.data]))
-        
-        if active_mssvs:
-            # Xóa những sinh viên KHÔNG nằm trong danh sách active_mssvs
-            supabase.table("students").delete().not_.in_("mssv", active_mssvs).execute()
-        # -----------------------------------------------------------------------
-
         print(f"DEBUG: Ket qua thuc te trong DB: {actual_count} sinh vien cho lop {class_code_str}")
         
         return {
@@ -606,14 +595,6 @@ async def sync_students_from_json(file: UploadFile = File(...)):
         supabase.table("class_students").delete().eq("class_id", class_id).execute()
         junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
         supabase.table("class_students").upsert(junction_data, on_conflict="class_id,mssv").execute()
-
-        # --- BƯỚC TỔNG VỆ SINH: Xóa sinh viên mồ côi ---
-        print("DEBUG: Dang quet don sinh vien mo coi sau khi nap JSON...")
-        active_junctions = supabase.table("class_students").select("mssv").execute()
-        active_mssvs = list(set([j["mssv"] for j in active_junctions.data]))
-        if active_mssvs:
-            supabase.table("students").delete().not_.in_("mssv", active_mssvs).execute()
-        # -----------------------------------------------
 
         return {
             "status": "success",
