@@ -502,6 +502,21 @@ async def sync_students_from_excel(file: UploadFile = File(...)):
         
         print(f"DEBUG: Ket qua thuc te trong DB: {actual_count} sinh vien cho lop {class_code_str}")
         
+        # --- SAFE CLEANUP ---
+        try:
+            # 1. Get MSSVs in classes
+            active_j = supabase.table("class_students").select("mssv").execute()
+            active_m = {j["mssv"] for j in active_j.data} if active_j.data else set()
+            # 2. Get MSSVs with attendance
+            attn_res = supabase.table("attendance_records").select("mssv").execute()
+            attn_m = {r["mssv"] for r in attn_res.data} if attn_res.data else set()
+            # 3. Keep list
+            keep_list = active_m.union(attn_m)
+            # 4. Delete orphans
+            if keep_list:
+                supabase.table("students").delete().not_.in_("mssv", list(keep_list)).execute()
+        except: pass # Bypass if error during cleanup
+        
         return {
             "total_rows_found": stats["total_rows_found"],
             "successfully_synced": actual_count,
@@ -580,6 +595,17 @@ async def sync_students_from_json(file: UploadFile = File(...)):
         supabase.table("class_students").delete().eq("class_id", class_id).execute()
         junction_data = [{"class_id": class_id, "mssv": s["mssv"]} for s in processed_students]
         supabase.table("class_students").upsert(junction_data, on_conflict="class_id,mssv").execute()
+
+        # --- SAFE CLEANUP ---
+        try:
+            active_j = supabase.table("class_students").select("mssv").execute()
+            active_m = {j["mssv"] for j in active_j.data} if active_j.data else set()
+            attn_res = supabase.table("attendance_records").select("mssv").execute()
+            attn_m = {r["mssv"] for r in attn_res.data} if attn_res.data else set()
+            keep_list = active_m.union(attn_m)
+            if keep_list:
+                supabase.table("students").delete().not_.in_("mssv", list(keep_list)).execute()
+        except: pass
 
         return {
             "status": "success",
