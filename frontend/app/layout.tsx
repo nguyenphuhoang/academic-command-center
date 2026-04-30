@@ -7,9 +7,10 @@ import Link from "next/link";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Academic Command Center",
-  description: "Quản lý công việc dành cho Giảng viên",
+  title: "Academic Command Center V3.1",
+  description: "Hệ thống quản lý công việc và điểm danh chuyên nghiệp",
 };
+// Force build: 2026-04-30 08:58
 
 export default function RootLayout({
   children,
