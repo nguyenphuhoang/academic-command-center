@@ -105,6 +105,9 @@ export default function AdminSyncPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 min-h-screen bg-slate-50">
+      <div className="bg-red-600 text-white text-center py-3 mb-6 rounded-2xl font-black animate-bounce shadow-lg">
+        🚨 CẢNH BÁO: PHIÊN BẢN v2.0 ĐÃ SẴN SÀNG - HỖ TRỢ FILE .JSON 🚀
+      </div>
       <header className="flex items-center gap-4 mb-10">
         <Link href="/" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
           <ChevronLeft className="w-6 h-6" />

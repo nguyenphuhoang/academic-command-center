@@ -1,0 +1,271 @@
+{
+    "class_id": "225NMG03",
+    "subject_name": "Nền móng",
+    "total_students": 44,
+    "students": [
+        {
+            "mssv": "2415061122207",
+            "full_name": "HỒ HOÀNG BẢO",
+            "dob": "12/20/2006",
+            "email": "2415061122207@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122303",
+            "full_name": "NGUYỄN TÔN GIA BẢO",
+            "dob": "07/28/2006",
+            "email": "2415061122303@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122304",
+            "full_name": "NGUYỄN VĂN BÌNH",
+            "dob": "07/31/2005",
+            "email": "2415061122304@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122305",
+            "full_name": "LÊ HỒ QUỐC DANH",
+            "dob": "03/26/2006",
+            "email": "2415061122305@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122209",
+            "full_name": "NGUYỄN PHAN THÀNH DANH",
+            "dob": "01/13/2006",
+            "email": "2415061122209@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122111",
+            "full_name": "NGUYỄN DUY",
+            "dob": "06/08/2006",
+            "email": "2415061122111@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122315",
+            "full_name": "HOÀNG TRỌNG HẢI",
+            "dob": "02/25/2006",
+            "email": "2415061122315@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122316",
+            "full_name": "PHAN PHƯỚC HẬU",
+            "dob": "11/24/2006",
+            "email": "2415061122316@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122211",
+            "full_name": "NGUYỄN ĐỨC SỸ HIỆP",
+            "dob": "10/15/2006",
+            "email": "2415061122211@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122106",
+            "full_name": "TRẦN LÊ HOÀN",
+            "dob": "06/04/2006",
+            "email": "2415064122106@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122108",
+            "full_name": "LÊ NHẬT HOÀNG",
+            "dob": "11/26/2006",
+            "email": "2415064122108@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122212",
+            "full_name": "NGUYỄN NHẬT HOÀNG",
+            "dob": "11/12/2006",
+            "email": "2415061122212@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122118",
+            "full_name": "NGUYỄN HỒNG HUY",
+            "dob": "05/01/2006",
+            "email": "2415061122118@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122122",
+            "full_name": "LÊ PHƯỚC KHANG",
+            "dob": "02/06/2006",
+            "email": "2415061122122@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122221",
+            "full_name": "NGUYỄN THANH LÂM",
+            "dob": "07/13/2006",
+            "email": "2415061122221@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122112",
+            "full_name": "TÔ XUÂN LÂM",
+            "dob": "02/20/2006",
+            "email": "2415064122112@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "21115061120250",
+            "full_name": "TRẦN TRUNG LĨNH",
+            "dob": "07/20/2003",
+            "email": "nan"
+        },
+        {
+            "mssv": "2415061122125",
+            "full_name": "HÀ QUANG LƯỢNG",
+            "dob": "03/10/2006",
+            "email": "2415061122125@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122225",
+            "full_name": "LÊ LONG NHẬT",
+            "dob": "09/14/2006",
+            "email": "2415061122225@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122227",
+            "full_name": "LÊ NGUYỄN THIÊN NHIÊN",
+            "dob": "05/15/2006",
+            "email": "2415061122227@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "23115061122322",
+            "full_name": "NGÔ THỊNH PHÁT",
+            "dob": "03/23/2005",
+            "email": "23115061122322@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122228",
+            "full_name": "NGUYỄN THANH PHÁT",
+            "dob": "06/20/2006",
+            "email": "2415061122228@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122230",
+            "full_name": "TIÊU NGỌC PHÔNG",
+            "dob": "08/21/2006",
+            "email": "2415061122230@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "23115061122324",
+            "full_name": "NGUYỄN HỮU PHỤNG",
+            "dob": "05/11/2005",
+            "email": "23115061122324@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122234",
+            "full_name": "HUỲNH ĐĂNG PHƯỚC",
+            "dob": "03/10/2006",
+            "email": "2415061122234@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122334",
+            "full_name": "VÕ HỮU MẠNH QUÂN",
+            "dob": "01/31/2006",
+            "email": "2415061122334@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122236",
+            "full_name": "NGUYỄN LƯƠNG SONG",
+            "dob": "08/15/2006",
+            "email": "2415061122236@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122136",
+            "full_name": "HỒ VĂN TÀI",
+            "dob": "01/07/2006",
+            "email": "2415061122136@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122338",
+            "full_name": "TRẦN THIỆN THANH",
+            "dob": "01/27/2006",
+            "email": "2415061122338@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122340",
+            "full_name": "VÕ NGUYÊN TIẾN",
+            "dob": "10/22/2006",
+            "email": "2415061122340@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122341",
+            "full_name": "HUỲNH HÀ TIỀN",
+            "dob": "02/24/2006",
+            "email": "2415061122341@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122145",
+            "full_name": "NGUYỄN ĐỨC NGUYÊN TRỌNG",
+            "dob": "12/08/2006",
+            "email": "2415061122145@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122124",
+            "full_name": "LƯU LÊ VẠN TRƯỜNG",
+            "dob": "09/27/2006",
+            "email": "2415064122124@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "22115061122153",
+            "full_name": "NGUYỄN XUÂN TRƯỜNG",
+            "dob": "01/11/2004",
+            "email": "22115061122153@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122247",
+            "full_name": "NGUYỄN ANH TUẤN",
+            "dob": "10/16/2006",
+            "email": "2415061122247@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "23115061122336",
+            "full_name": "NGUYỄN ĐỨC MINH TUẤN",
+            "dob": "06/25/2005",
+            "email": "23115061122336@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122125",
+            "full_name": "NGUYỄN THANH TUẤN",
+            "dob": "10/28/2006",
+            "email": "2415064122125@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122126",
+            "full_name": "NGUYỄN THANH TUẤN",
+            "dob": "03/31/2006",
+            "email": "2415064122126@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122345",
+            "full_name": "NGUYỄN VĂN TUẤN",
+            "dob": "10/31/2006",
+            "email": "2415061122345@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122127",
+            "full_name": "LÊ THÀNH VIỆT",
+            "dob": "01/02/2006",
+            "email": "2415064122127@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122149",
+            "full_name": "NGÔ QUỐC VIỆT",
+            "dob": "01/01/2006",
+            "email": "2415061122149@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122129",
+            "full_name": "NGUYỄN THANH VIỆT",
+            "dob": "11/20/2006",
+            "email": "2415064122129@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415064122128",
+            "full_name": "PHẠM VĂN VIỆT",
+            "dob": "05/16/2006",
+            "email": "2415064122128@sv.ute.udn.vn"
+        },
+        {
+            "mssv": "2415061122347",
+            "full_name": "NGUYỄN HUỲNH QUỐC VƯƠNG",
+            "dob": "02/22/2006",
+            "email": "2415061122347@sv.ute.udn.vn"
+        }
+    ]
+}
