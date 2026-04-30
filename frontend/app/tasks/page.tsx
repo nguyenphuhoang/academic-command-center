@@ -206,7 +206,7 @@ export default function TasksPage() {
                 <div className="flex items-center gap-4 mt-1 text-sm">
                   <span className="flex items-center gap-1.5 text-indigo-600 font-bold">
                     <BookOpen className="w-4 h-4" />
-                    {task.subjects?.name || "N/A"}
+                    {(task as any).subjects?.name || "Chưa phân loại"}
                   </span>
                   <span className="text-slate-300">|</span>
                   <span className="flex items-center gap-1.5 text-slate-400 font-medium">
