@@ -34,7 +34,9 @@ interface Document {
 export default function ArchivePage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [fetchingSubjects, setFetchingSubjects] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -45,22 +47,39 @@ export default function ArchivePage() {
   const [newSubjectName, setNewSubjectName] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
+
+  const fetchSubjects = async () => {
+    setFetchingSubjects(true);
+    setFetchError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/subjects?v=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSubjects(data);
+      } else {
+        setFetchError("Không thể tải danh sách môn học.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch subjects:", err);
+      setFetchError("Lỗi kết nối máy chủ.");
+    } finally {
+      setFetchingSubjects(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
-      const [docsRes, subjectsRes] = await Promise.all([
-        fetch(`${apiUrl}/api/documents?v=${Date.now()}`),
-        fetch(`${apiUrl}/api/subjects?v=${Date.now()}`)
+      const [docsRes] = await Promise.all([
+        fetch(`${API_URL}/api/documents?v=${Date.now()}`)
       ]);
       
-      if (docsRes.ok && subjectsRes.ok) {
+      if (docsRes.ok) {
         const docsData = await docsRes.json();
-        const subjectsData = await subjectsRes.json();
-        console.log("DEBUG: Loaded subjects:", subjectsData);
         setDocuments(docsData);
-        setSubjects(subjectsData);
       }
+      await fetchSubjects();
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
@@ -85,7 +104,6 @@ export default function ArchivePage() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalSubjectId = subjectId === "NEW" ? "" : subjectId;
     
     if (!file || !docName || (subjectId === "NEW" && !newSubjectName) || (!subjectId && subjects.length > 0)) {
       alert("Vui lòng điền đầy đủ thông tin: File, Tên hiển thị và Môn học.");
@@ -103,8 +121,7 @@ export default function ArchivePage() {
         formData.append("subject_id", subjectId);
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
-      const res = await fetch(`${apiUrl}/api/documents/upload`, {
+      const res = await fetch(`${API_URL}/api/documents/upload`, {
         method: "POST",
         body: formData,
       });
@@ -116,8 +133,8 @@ export default function ArchivePage() {
         setSubjectId("");
         fetchData();
       } else {
-        const error = await res.json();
-        alert(`Lỗi upload: ${error.detail || "Không rõ nguyên nhân"}`);
+        const errorData = await res.json().catch(() => ({}));
+        alert(`Lỗi upload: ${errorData.detail || "Không rõ nguyên nhân"}`);
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -295,21 +312,30 @@ export default function ArchivePage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Gán vào môn học</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Gán vào môn học {fetchingSubjects && <span className="text-indigo-500 text-xs ml-2 animate-pulse">(Đang tải...)</span>}
+                  </label>
                   <div className="space-y-3">
                     <select 
                       value={subjectId}
                       onChange={(e) => setSubjectId(e.target.value)}
-                      className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium transition-all appearance-none"
+                      disabled={fetchingSubjects}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium transition-all appearance-none disabled:opacity-50"
                     >
-                      <option value="">Chọn môn học từ danh sách...</option>
+                      <option value="">Chọn môn học...</option>
                       {subjects.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                        <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ""}</option>
                       ))}
                       <option value="NEW">+ Tạo môn học mới...</option>
                     </select>
 
-                    {(subjectId === "NEW" || subjects.length === 0) && (
+                    {fetchError && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {fetchError} <button type="button" onClick={fetchSubjects} className="underline font-bold">Thử lại</button>
+                      </p>
+                    )}
+
+                    {(subjectId === "NEW" || (subjects.length === 0 && !fetchingSubjects)) && (
                       <div className="animate-in slide-in-from-top-2 duration-300">
                         <input 
                           type="text" 
