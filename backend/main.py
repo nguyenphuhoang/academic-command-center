@@ -221,13 +221,16 @@ async def upload_document(
         file_path = f"{final_subject_id}/{os.urandom(8).hex()}_{file.filename}"
         
         # 2. Upload to Supabase Storage
-        # Note: Bucket must be created manually or we handle it if possible.
-        # supabase.storage.create_bucket('academic-docs') might fail if no permissions.
-        storage_response = supabase.storage.from_("academic-docs").upload(
-            path=file_path,
-            file=file_content,
-            file_options={"content-type": file.content_type}
-        )
+        print(f"DEBUG: Dang tai file len Supabase Storage: {file_path}")
+        try:
+            storage_response = supabase.storage.from_("academic-docs").upload(
+                path=file_path,
+                file=file_content,
+                file_options={"content-type": file.content_type}
+            )
+        except Exception as storage_err:
+            print(f"DEBUG STORAGE ERROR: {str(storage_err)}")
+            raise Exception(f"Lỗi kho lưu trữ (Supabase Storage): {str(storage_err)}. Hãy đảm bảo bạn đã tạo bucket 'academic-docs'.")
         
         # 3. Get Public URL
         public_url = supabase.storage.from_("academic-docs").get_public_url(file_path)
@@ -237,16 +240,17 @@ async def upload_document(
             "name": name,
             "file_url": public_url,
             "file_path": file_path,
-            "subject_id": subject_id,
+            "subject_id": final_subject_id, # FIX: Dùng ID chuẩn thay vì chuỗi "NEW"
             "file_type": file.content_type or file_ext
         }
         
+        print(f"DEBUG: Dang luu metadata vao Database: {doc_data}")
         db_response = supabase.table("documents").insert(doc_data).execute()
-        return db_response.data[0] if db_response.data else doc_data
+        return {"status": "success", "data": db_response.data[0] if db_response.data else doc_data}
         
     except Exception as e:
-        
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"DEBUG UPLOAD ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi tải lên: {str(e)}")
 
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary():
