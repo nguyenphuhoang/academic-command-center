@@ -150,9 +150,15 @@ def get_tasks():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Join with subjects to get the subject name
-        response = supabase.table("tasks").select("*, subjects(name)").execute()
-        return response.data
+        # Manual Join: Fetch tasks and subjects separately to avoid PGRST200 error
+        tasks_res = supabase.table("tasks").select("*").execute()
+        subjects_res = supabase.table("subjects").select("id, name").execute()
+        
+        subjects_map = {s['id']: s for s in (subjects_res.data or [])}
+        for task in (tasks_res.data or []):
+            task['subjects'] = subjects_map.get(task.get('subject_id'))
+            
+        return tasks_res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -186,9 +192,15 @@ def get_documents():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
     try:
-        # Fetch documents joined with subject name
-        response = supabase.table("documents").select("*, subjects(name)").execute()
-        return response.data
+        # Manual Join: Fetch documents and subjects separately to avoid PGRST200 error
+        docs_res = supabase.table("documents").select("*").execute()
+        subjects_res = supabase.table("subjects").select("id, name").execute()
+        
+        subjects_map = {s['id']: s for s in (subjects_res.data or [])}
+        for doc in (docs_res.data or []):
+            doc['subjects'] = subjects_map.get(doc.get('subject_id'))
+            
+        return docs_res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -263,8 +275,15 @@ def get_dashboard_summary():
         tasks_res = supabase.table("tasks").select("id", count="exact").neq("status", "Hoàn thành").execute()
         docs_res = supabase.table("documents").select("id", count="exact").execute()
         
-        # 2. Get recent tasks (Top 5)
-        recent_tasks = supabase.table("tasks").select("*, subjects(name)").neq("status", "Hoàn thành").order("deadline").limit(5).execute()
+        # 2. Get recent tasks (Manual Join)
+        recent_tasks_res = supabase.table("tasks").select("*").neq("status", "Hoàn thành").order("deadline").limit(5).execute()
+        subjects_res_all = supabase.table("subjects").select("id, name").execute()
+        subjects_map = {s['id']: s for s in (subjects_res_all.data or [])}
+        
+        recent_tasks = []
+        for task in (recent_tasks_res.data or []):
+            task['subjects'] = subjects_map.get(task.get('subject_id'))
+            recent_tasks.append(task)
         
         return {
             "stats": {
@@ -272,10 +291,9 @@ def get_dashboard_summary():
                 "tasks_pending": tasks_res.count if tasks_res.count is not None else 0,
                 "documents": docs_res.count if docs_res.count is not None else 0
             },
-            "recent_tasks": recent_tasks.data or []
+            "recent_tasks": recent_tasks
         }
     except Exception as e:
-        
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/attendance/session")
