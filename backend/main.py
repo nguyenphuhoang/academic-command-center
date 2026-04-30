@@ -221,19 +221,20 @@ async def upload_document(
         file_path = f"{final_subject_id}/{os.urandom(8).hex()}_{file.filename}"
         
         # 2. Upload to Supabase Storage
-        print(f"DEBUG: Dang tai file len Supabase Storage: {file_path}")
+        BUCKET_NAME = "documents"
+        print(f"DEBUG: Dang tai file len Supabase Storage (Bucket: {BUCKET_NAME}): {file_path}")
         try:
-            storage_response = supabase.storage.from_("academic-docs").upload(
+            storage_response = supabase.storage.from_(BUCKET_NAME).upload(
                 path=file_path,
                 file=file_content,
                 file_options={"content-type": file.content_type}
             )
         except Exception as storage_err:
             print(f"DEBUG STORAGE ERROR: {str(storage_err)}")
-            raise Exception(f"Lỗi kho lưu trữ (Supabase Storage): {str(storage_err)}. Hãy đảm bảo bạn đã tạo bucket 'academic-docs'.")
+            raise Exception(f"Lỗi kho lưu trữ: {str(storage_err)}. HƯỚNG DẪN: Bạn cần vào Supabase Storage tạo một Bucket tên là '{BUCKET_NAME}' và để chế độ Public.")
         
         # 3. Get Public URL
-        public_url = supabase.storage.from_("academic-docs").get_public_url(file_path)
+        public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(file_path)
         
         # 4. Save metadata to database
         doc_data = {
