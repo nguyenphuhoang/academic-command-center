@@ -300,9 +300,7 @@ def create_attendance_session(session: SessionCreate):
                     target_class_id = new_class.data[0]["id"]
 
         response = supabase.table("attendance_sessions").insert({
-            "class_id": target_class_id,
-            "teacher_lat": session.lat,
-            "teacher_lng": session.lng
+            "class_id": target_class_id
         }).execute()
         return response.data[0] if response.data else {"id": "error"}
     except Exception as e:
@@ -347,24 +345,14 @@ def submit_attendance(submission: AttendanceSubmit):
                 raise HTTPException(status_code=400, detail="Thiết bị này đã được sử dụng để điểm danh cho một sinh viên khác trong buổi học này.")
         # -----------------------------------------------
 
-        # 2. Calculate distance
-        dist = calculate_distance(
-            session["teacher_lat"], session["teacher_lng"],
-            submission.lat, submission.lng
-        )
-
-        # 3. Check distance (<= 100m)
-        if dist > 100:
-            raise HTTPException(status_code=400, detail=f"Bạn đang ở quá xa vị trí điểm danh ({dist:.1f}m).")
+        # Khong kiem tra GPS vi cot toa do khong ton tai
+        dist = 0
 
         # 4. Save record
         record_res = supabase.table("attendance_records").insert({
             "session_id": submission.session_id,
             "mssv": submission.mssv,
-            "student_lat": submission.lat,
-            "student_lng": submission.lng,
-            "distance": dist,
-            "device_id": submission.device_id 
+            "distance": dist
         }).execute()
         
         return {
