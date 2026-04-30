@@ -48,7 +48,7 @@ else:
 def health_check():
     status = "healthy"
     supabase_status = "connected" if supabase else "disconnected"
-    return {"status": status, "supabase": supabase_status, "message": "API backend is running!"}
+    return {"status": status, "supabase": supabase_status, "message": "API backend is running! V3"}
 
 @app.get("/api/test-supabase")
 def test_supabase():
