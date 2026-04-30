@@ -84,8 +84,10 @@ export default function ArchivePage() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !docName || !subjectId) {
-      alert("Vui lòng điền đầy đủ thông tin và chọn file.");
+    const finalSubjectId = subjectId === "NEW" ? "" : subjectId;
+    
+    if (!file || !docName || (subjectId === "NEW" && !newSubjectName) || (!subjectId && subjects.length > 0)) {
+      alert("Vui lòng điền đầy đủ thông tin: File, Tên hiển thị và Môn học.");
       return;
     }
     
@@ -94,7 +96,11 @@ export default function ArchivePage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("name", docName);
-      formData.append("subject_id", subjectId);
+      if (subjectId === "NEW") {
+        formData.append("new_subject_name", newSubjectName);
+      } else {
+        formData.append("subject_id", subjectId);
+      }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://academic-command-center.onrender.com";
       const res = await fetch(`${apiUrl}/api/documents/upload`, {
@@ -289,17 +295,34 @@ export default function ArchivePage() {
                 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Gán vào môn học</label>
-                  <select 
-                    value={subjectId}
-                    onChange={(e) => setSubjectId(e.target.value)}
-                    className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium transition-all appearance-none"
-                    required
-                  >
-                    <option value="">Chọn môn học...</option>
-                    {subjects.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-3">
+                    <select 
+                      value={subjectId}
+                      onChange={(e) => setSubjectId(e.target.value)}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-medium transition-all appearance-none"
+                    >
+                      <option value="">Chọn môn học từ danh sách...</option>
+                      {subjects.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                      <option value="NEW">+ Tạo môn học mới...</option>
+                    </select>
+
+                    {(subjectId === "NEW" || subjects.length === 0) && (
+                      <div className="animate-in slide-in-from-top-2 duration-300">
+                        <input 
+                          type="text" 
+                          placeholder="Nhập tên môn học mới (VD: Nền móng)"
+                          className="w-full px-5 py-3.5 bg-indigo-50 border border-indigo-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-indigo-900 font-bold transition-all"
+                          onChange={(e) => {
+                            setSubjectId("NEW");
+                            setNewSubjectName(e.target.value);
+                          }}
+                        />
+                        <p className="text-[10px] text-indigo-400 mt-2 ml-2 font-medium">Hệ thống sẽ tự động tạo môn học này nếu chưa có.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

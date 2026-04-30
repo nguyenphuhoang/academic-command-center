@@ -196,16 +196,29 @@ def get_documents():
 async def upload_document(
     file: UploadFile = File(...),
     name: str = Form(...),
-    subject_id: str = Form(...)
+    subject_id: str = Form(None),
+    new_subject_name: str = Form(None)
 ):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase is not initialized.")
-    
     try:
-        # 1. Read file content
+        # 1. Xử lý tạo môn học mới nếu có
+        final_subject_id = subject_id
+        if new_subject_name and not final_subject_id:
+            # Upsert môn học mới
+            sub_res = supabase.table("subjects").upsert({
+                "name": new_subject_name,
+                "code": "".join(filter(str.isalpha, new_subject_name[:5])).upper(),
+                "semester": "225"
+            }, on_conflict="name").execute()
+            if sub_res.data:
+                final_subject_id = sub_res.data[0]["id"]
+
+        if not final_subject_id:
+            raise HTTPException(status_code=400, detail="Vui lòng chọn hoặc nhập môn học.")
         file_content = await file.read()
         file_ext = os.path.splitext(file.filename)[1]
-        file_path = f"{subject_id}/{os.urandom(8).hex()}_{file.filename}"
+        file_path = f"{final_subject_id}/{os.urandom(8).hex()}_{file.filename}"
         
         # 2. Upload to Supabase Storage
         # Note: Bucket must be created manually or we handle it if possible.
