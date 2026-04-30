@@ -161,7 +161,7 @@ export default function Home() {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-slate-900 truncate">{task.title}</h4>
                     <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-                      <span className="font-semibold text-indigo-600">{task.subjects.name}</span>
+                      <span className="font-semibold text-indigo-600">{task.subjects?.name || "Chưa phân loại"}</span>
                       <span>•</span>
                       <span>Hạn: {new Date(task.deadline).toLocaleDateString('vi-VN')}</span>
                     </p>
