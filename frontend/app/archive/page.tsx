@@ -42,6 +42,7 @@ export default function ArchivePage() {
   const [file, setFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [newSubjectName, setNewSubjectName] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const fetchData = async () => {
