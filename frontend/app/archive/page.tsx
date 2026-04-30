@@ -11,7 +11,8 @@ import {
   X, 
   Loader2, 
   Search,
-  BookOpen
+  BookOpen,
+  Trash2
 } from "lucide-react";
 
 interface Subject {
@@ -157,6 +158,25 @@ export default function ArchivePage() {
     doc.subjects?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa tài liệu này không?")) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/documents/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (res.ok) {
+        alert("Đã xóa tài liệu thành công.");
+        fetchData();
+      } else {
+        alert("Không thể xóa tài liệu.");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối khi xóa tài liệu.");
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -216,15 +236,24 @@ export default function ArchivePage() {
                 <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-indigo-50 transition-colors">
                   {getFileIcon(doc.file_type)}
                 </div>
-                <a 
-                  href={doc.file_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                  title="Tải về"
-                >
-                  <Download className="w-5 h-5" />
-                </a>
+                <div className="flex items-center gap-1">
+                  <a 
+                    href={doc.file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="Tải về"
+                  >
+                    <Download className="w-5 h-5" />
+                  </a>
+                  <button 
+                    onClick={() => handleDelete(doc.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    title="Xóa"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
               
               <h3 className="font-bold text-slate-900 mb-1 line-clamp-1" title={doc.name}>

@@ -199,6 +199,16 @@ export default function TeacherAttendancePage() {
     }
   };
 
+  const handleRestartSession = () => {
+    if (session?.status === "active") {
+      if (!confirm("Bạn đang có một buổi điểm danh đang diễn ra. Bạn có chắc muốn hủy và bắt đầu lại không?")) return;
+    }
+    setSession(null);
+    setIsSessionActive(false);
+    setSelectedClassId("");
+    setError(null);
+  };
+
   const handleStartAttendance = () => {
     if (!selectedClassId) {
       setError("Vui lòng chọn lớp học.");
@@ -450,7 +460,7 @@ export default function TeacherAttendancePage() {
               </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                   <button
                     onClick={handleFinalizeSession}
                     disabled={loading || session.status !== "active"}
                     className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
@@ -459,8 +469,16 @@ export default function TeacherAttendancePage() {
                   </button>
                   
                   <button
+                    onClick={handleRestartSession}
+                    className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
+                  >
+                    HỦY / LÀM MỚI
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <button
                     onClick={handleExportAbsentees}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
                   >
                     <FileDown className="w-5 h-5" /> TẢI BÁO CÁO
                   </button>

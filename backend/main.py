@@ -265,6 +265,27 @@ async def upload_document(
         print(f"DEBUG UPLOAD ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi tải lên: {str(e)}")
 
+@app.delete("/api/documents/{doc_id}")
+def delete_document(doc_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase is not initialized.")
+    try:
+        # 1. Get document info to delete from storage if needed
+        doc_res = supabase.table("documents").select("file_path").eq("id", doc_id).execute()
+        if doc_res.data:
+            file_path = doc_res.data[0]["file_path"]
+            # Delete from storage (optional, but good practice)
+            try:
+                supabase.storage.from_("academic-docs").remove([file_path])
+            except:
+                pass
+        
+        # 2. Delete from database
+        res = supabase.table("documents").delete().eq("id", doc_id).execute()
+        return {"status": "success", "message": "Đã xóa tài liệu."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary():
     if not supabase:
@@ -321,7 +342,13 @@ def create_attendance_session(session: SessionCreate):
         response = supabase.table("attendance_sessions").insert({
             "class_id": target_class_id
         }).execute()
-        return response.data[0] if response.data else {"id": "error"}
+        
+        if response.data:
+            # Force status to active so frontend shows the QR code correctly
+            result = response.data[0]
+            result["status"] = "active"
+            return result
+        return {"id": "error"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
